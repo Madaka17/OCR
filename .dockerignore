@@ -1,0 +1,6 @@
+.venv
+__pycache__
+**/__pycache__
+OpenThai2.0-OCR-Text/.cache
+OpenThai2.0-OCR-Text/pytorch
+*.zip

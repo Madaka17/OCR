@@ -1,0 +1,18 @@
+# dependencies and environments
+node_modules/
+.venv/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+
+# runtime data: jobs, logs, password config
+data/
+
+# agent working notes
+.superpowers/
+.claude/
+
+# model caches
+OpenThai2.0-OCR-Text/.cache/
+OpenThai2.0-OCR-Text/pytorch/
+*.zip

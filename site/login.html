@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เข้าสู่ระบบ · Thai OCR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+  /* Indigo dashboard: dark only. Same tokens as index.html. */
+  :root {
+    color-scheme: dark;
+    --bg: #0A0C13;
+    --panel: #0F121B;
+    --card: #141824;
+    --field: #191E2C;
+    --field-hover: #1E2435;
+    --border: #252B3C;
+    --hover-border: #343B52;
+    --text: #E8EAF3;
+    --text-2: #C3C7D6;
+    --muted: #8F96AD;
+    --accent: #8F8DFF;
+    --accent-strong: #5F5CE6;
+    --accent-soft: rgba(110,107,248,.14);
+    --accent-text: #FFFFFF;
+    --red: #f87171;
+    --red-fill: rgba(248, 113, 113, 0.2);
+    --radius: 14px;
+    --radius-lg: 20px;
+    --chip-radius: 999px;
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+    --font:"IBM Plex Sans Thai","Leelawadee UI","Segoe UI",Tahoma,sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: radial-gradient(80% 50% at 50% 0%, rgba(110,107,248,.10), transparent 70%), var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    padding: 28px 24px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; margin-bottom: 18px; }
+  .logo { flex: none; display: block; }
+  .logo-bg { fill: var(--accent-strong); }
+  .logo-fg {
+    fill: none;
+    stroke: var(--accent-text);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .muted { color: var(--muted); font-size: 0.88rem; margin-bottom: 14px; }
+  label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+  input[type="password"] {
+    font: inherit;
+    width: 100%;
+    min-height: 48px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--field);
+    color: var(--text);
+    transition: border-color .18s, box-shadow .18s;
+  }
+  input[type="password"]:focus {
+    outline: none;
+    border-color: var(--accent-strong);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  input[type="password"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .btn {
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    width: 100%;
+    min-height: 46px;
+    margin-top: 16px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--accent-strong);
+    background: var(--accent-strong);
+    color: #fff;
+    box-shadow: 0 8px 24px -10px var(--accent-strong);
+    cursor: pointer;
+    transition: filter .18s, box-shadow .18s;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: 0.6; cursor: progress; }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .error {
+    margin-top: 14px;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    background: var(--red-fill);
+    color: var(--red);
+    font-weight: 500;
+    font-size: 0.92rem;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn, input[type="password"] { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main class="login-card">
+  <div class="brand">
+    <svg class="logo" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+      <rect class="logo-bg" x="0" y="0" width="28" height="28" rx="7"/>
+      <path class="logo-fg" d="M8 6.5h8.5L20 10v11.5H8z"/>
+      <path class="logo-fg" d="M11 14h6M11 17.5h4.5"/>
+    </svg>
+    <span>OCR trial</span>
+  </div>
+  <p class="muted" id="intro">กรุณาใส่รหัสผ่านเพื่อใช้งาน</p>
+
+  <form id="login-form">
+    <label for="password">รหัสผ่าน</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+    <button id="submit-btn" class="btn" type="submit">เข้าสู่ระบบ</button>
+  </form>
+  <p id="error" class="error" role="alert" hidden></p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var params = new URLSearchParams(location.search);
+  var adminMode = params.get("admin") === "1";
+  var form = document.getElementById("login-form");
+  var passwordInput = document.getElementById("password");
+  var submitBtn = document.getElementById("submit-btn");
+  var errorBox = document.getElementById("error");
+  var intro = document.getElementById("intro");
+
+  if (adminMode) intro.textContent = "กรุณาใส่รหัสผ่านผู้ดูแลระบบ";
+
+  // Same logic as JobsClient.safeNext in js/jobs_client.js (kept inline because the login page
+  // is public and /js/jobs_client.js needs a session). Tab, CR, LF and backslash are rejected
+  // because browsers strip the first three from URLs, which would turn "/<TAB>/x" into "//x".
+  function safeNext(value, origin) {
+    if (typeof value !== "string" || value.charAt(0) !== "/") return "/";
+    if (/[\x5c\x09\x0a\x0d]/.test(value)) return "/";
+    var u;
+    try {
+      u = new URL(value, origin);
+    } catch (err) {
+      return "/";
+    }
+    if (u.origin !== origin) return "/";
+    return u.pathname + u.search + u.hash;
+  }
+
+  function showError(message) {
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var password = passwordInput.value;
+    if (!password) return;
+    errorBox.hidden = true;
+    submitBtn.disabled = true;
+    fetch("/api/login", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: password })
+    }).then(function (res) {
+      if (res.ok) {
+        location.replace(adminMode ? "/admin" : safeNext(params.get("next"), location.origin));
+        return;
+      }
+      if (res.status === 401) {
+        showError("รหัสผ่านไม่ถูกต้อง");
+      } else {
+        showError("เข้าสู่ระบบไม่สำเร็จ โปรดลองอีกครั้ง");
+      }
+      submitBtn.disabled = false;
+      passwordInput.select();
+    }, function () {
+      showError("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ โปรดลองอีกครั้ง");
+      submitBtn.disabled = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>

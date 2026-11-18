@@ -1,0 +1,23 @@
+{
+ "shape": [
+  600,
+  800
+ ],
+ "detect": [],
+ "split_counts": [],
+ "page": {
+  "boxes": [],
+  "texts": [],
+  "confs": [],
+  "rows": [],
+  "angle": 0.0,
+  "fragments": []
+ },
+ "read": {
+  "text": "",
+  "lines": [],
+  "dropped": [],
+  "rotation": 0,
+  "text_angle": 0.0
+ }
+}

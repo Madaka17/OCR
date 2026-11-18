@@ -1,0 +1,2150 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thai OCR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+  /* Indigo dashboard: dark only. Tokens are the single source of colour. */
+  :root {
+    color-scheme: dark;
+    --bg: #0A0C13;
+    --panel: #0F121B;
+    --card: #141824;
+    --field: #191E2C;
+    --field-hover: #1E2435;
+    --border: #252B3C;
+    --hover-border: #343B52;
+    --text: #E8EAF3;
+    --text-2: #C3C7D6;
+    --muted: #8F96AD;
+    --accent: #8F8DFF;
+    --accent-strong: #5F5CE6;
+    --accent-soft: rgba(110,107,248,.14);
+    --accent-text: #FFFFFF;
+    --green: #4ade80;
+    --amber: #f59e0b;
+    --red: #f87171;
+    --green-fill: rgba(74, 222, 128, 0.18);
+    --amber-fill: rgba(245, 158, 11, 0.2);
+    --red-fill: rgba(248, 113, 113, 0.2);
+    --match-fill: rgba(250, 204, 21, 0.28);
+    --match-strong: rgba(245, 158, 11, 0.6);
+    --radius: 14px;
+    --radius-lg: 20px;
+    --chip-radius: 999px;
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+    --nav-h: 56px;
+    --font:"IBM Plex Sans Thai","Leelawadee UI","Segoe UI",Tahoma,sans-serif;
+    --mono: ui-monospace, Consolas, "Cascadia Mono", monospace;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+  p, h1, h2, h3 { margin: 0; }
+  .muted { color: var(--muted); font-size: 0.88rem; }
+  .mono { font-family: var(--mono); }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    min-width: 0;
+  }
+
+  /* ---- navbar (top bar of the main column) ---- */
+  .main-col { min-width: 0; }
+  .navbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
+    min-height: var(--nav-h);
+    padding: 8px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; }
+  .logo { flex: none; display: block; }
+  .logo-bg { fill: var(--accent-strong); }
+  .logo-fg {
+    fill: none;
+    stroke: var(--accent-text);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .search-wrap {
+    flex: 1 1 320px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    max-width: 680px;
+    margin: 0 auto;
+  }
+  .search-box { position: relative; flex: 1 1 auto; min-width: 0; }
+  .search-box input {
+    font: inherit;
+    font-size: 0.92rem;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 74px 8px 16px;
+    border-radius: var(--chip-radius);
+    border: 1px solid var(--border);
+    background: var(--field);
+    color: var(--text);
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+  .search-box input:focus {
+    outline: none;
+    border-color: var(--accent-strong);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .search-box input::placeholder { color: var(--muted); }
+  .search-box input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .kbd {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    background: var(--panel);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .search-count {
+    min-width: 3.5em;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.88rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--chip-radius);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
+
+  /* ---- layout ---- */
+  .app { display: block; }
+  .sidebar {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+    min-width: 0;
+  }
+  .sidebar > .brand { padding: 4px 6px 14px; }
+  .main { padding: 20px 16px 48px; min-width: 0; }
+
+  /* segmented pill control */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--field);
+    margin-bottom: 4px;
+  }
+  .tab {
+    flex: 1;
+    font: inherit;
+    font-size: 0.9rem;
+    padding: 7px 12px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .tab.active {
+    background: var(--accent-strong);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 8px 24px -10px var(--accent-strong);
+  }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .side-section { padding: 16px 0; border-top: 1px solid var(--border); }
+  .panel > .side-section:first-child { border-top: 0; }
+  .side-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .conf-value { font-family: var(--mono); color: var(--accent); font-size: 0.85rem; }
+
+  /* ---- page header (main column) ---- */
+  .page-header {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .crumbs li { display: flex; align-items: center; gap: 8px; }
+  .crumbs li + li::before { content: "\203A"; opacity: 0.7; }
+  .crumbs svg { display: block; }
+  .crumbs [aria-current] { color: var(--accent); font-weight: 600; }
+  .page-header h1 {
+    font-size: clamp(22px, 2.6vw, 28px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    text-wrap: balance;
+  }
+  .page-sub { color: var(--muted); font-size: 0.92rem; }
+
+  /* ---- upload ---- */
+  .upload-btn { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; user-select: none; }
+  .upload-btn.drag { outline: 2px dashed var(--accent); outline-offset: 3px; }
+  .upload-btn.busy { opacity: 0.6; cursor: progress; pointer-events: none; }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 16px;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  .spinner {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner { animation-duration: 2.4s; }
+  }
+  .error {
+    margin: 0 0 16px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    background: var(--red-fill);
+    color: var(--red);
+    font-weight: 500;
+  }
+
+  /* ---- chips, buttons, inputs ---- */
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .chip {
+    font: inherit;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--chip-radius);
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .chip:hover { border-color: var(--hover-border); }
+  .chip.selected { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .chip-check { display: none; font-size: 0.8rem; font-weight: 700; }
+  .chip.selected .chip-check { display: inline; }
+  .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .chip:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pick-status { color: var(--muted); font-size: 0.85rem; margin: 2px 0 10px; font-variant-numeric: tabular-nums; }
+  .range-form { display: flex; gap: 6px; align-items: stretch; }
+  .range-input {
+    font: inherit;
+    font-size: 0.88rem;
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 16px;
+    border-radius: var(--chip-radius);
+    border: 1px solid var(--border);
+    background: var(--field);
+    color: var(--text);
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+  .range-input:focus {
+    outline: none;
+    border-color: var(--accent-strong);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .range-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .range-error { color: var(--red); font-size: 0.84rem; margin-top: 6px; }
+
+  .btn {
+    font: inherit;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 18px;
+    border-radius: var(--chip-radius);
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+  }
+  .btn:hover { border-color: var(--hover-border); color: var(--text); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn:disabled,
+  .btn:disabled:hover {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .btn-primary {
+    background: var(--accent-strong);
+    border-color: var(--accent-strong);
+    color: #fff;
+    font-weight: 600;
+    padding-inline: 22px;
+    box-shadow: 0 8px 24px -10px var(--accent-strong);
+  }
+  .btn-primary:hover { border-color: var(--accent-strong); color: #fff; filter: brightness(1.08); }
+  .btn-block { display: flex; width: 100%; margin-bottom: 8px; text-align: center; }
+  .btn.icon-btn { padding: 4px 12px; font-size: 1.05rem; line-height: 1.2; min-height: 40px; }
+  .filename {
+    display: block;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    overflow-wrap: anywhere;
+  }
+  .sidebar-foot { margin-top: 12px; font-size: 0.8rem; }
+
+  /* ---- switches and slider ---- */
+  .switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .switch {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    width: 40px;
+    height: 22px;
+    margin: 0;
+    border-radius: 999px;
+    background: var(--hover-border);
+    position: relative;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .switch::before {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s;
+  }
+  .switch:checked { background: var(--accent-strong); }
+  .switch:checked::before { transform: translateX(18px); }
+  .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .conf-slider { width: 100%; margin: 4px 0 0; accent-color: var(--accent-strong); }
+  .ticks {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 6px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- big empty-state dropzone (hero) ---- */
+  #empty-state {
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 32px 24px;
+    text-align: center;
+    border: 1.5px solid var(--accent-strong);
+    border-radius: var(--radius-lg);
+    background: radial-gradient(120% 60% at 50% 0%, rgba(110,107,248,.12), transparent 60%), var(--card);
+    box-shadow: 0 0 0 4px rgba(110, 107, 248, 0.08), var(--shadow);
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  }
+  #empty-state.drag {
+    border-style: dashed;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 6px rgba(110, 107, 248, 0.18), var(--shadow);
+  }
+  .drop-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid rgba(143, 141, 255, 0.22);
+  }
+  .empty-heading { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .empty-sub { color: var(--muted); font-size: 0.9rem; max-width: 40ch; }
+  .empty-title { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
+
+  /* ---- result header ---- */
+  .result-head { margin-bottom: 16px; }
+  .result-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+  .result-title h2 { font-size: 1.2rem; }
+  .result-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 4px; }
+  .result-sub .mono { font-size: 0.9rem; overflow-wrap: anywhere; }
+  .empty-card { text-align: center; padding: 56px 20px; }
+
+  /* ---- pages ---- */
+  #results { display: grid; gap: 18px; }
+  .page-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 12px;
+    margin-bottom: 12px;
+  }
+  .page-title { font-size: 1.05rem; }
+  .page-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .page-meta .sep { opacity: 0.6; }
+  .page-card { min-width: 0; }
+  .match-badge {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 1px 10px;
+    border-radius: var(--chip-radius);
+    color: var(--amber);
+    background: var(--amber-fill);
+  }
+  .page-body { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+  .col-lines { min-width: 0; }
+  .figure {
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .figure img { display: block; width: 100%; height: auto; }
+  .hide-images .col-image { display: none; }
+  .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .box {
+    stroke-width: 1.5px;
+    vector-effect: non-scaling-stroke;
+    transition: fill 0.1s, stroke-width 0.1s;
+  }
+  .box-hi { fill: var(--green-fill); stroke: var(--green); }
+  .box-mid { fill: var(--amber-fill); stroke: var(--amber); }
+  .box-lo { fill: var(--red-fill); stroke: var(--red); }
+  .box.active { stroke-width: 3px; }
+  .box-hi.active { fill: rgba(74, 222, 128, 0.42); }
+  .box-mid.active { fill: rgba(245, 158, 11, 0.42); }
+  .box-lo.active { fill: rgba(248, 113, 113, 0.44); }
+  .box.has-match { fill: var(--match-fill); stroke: var(--amber); }
+  .box.has-match.active { fill: var(--match-strong); }
+  .box.has-match.current { fill: var(--match-strong); stroke-width: 3px; }
+  .box.filtered { display: none; }
+  body.boxes-off .box:not(.has-match) { display: none; }
+  .field {
+    stroke-width: 2px;
+    stroke-dasharray: 6 4;
+    vector-effect: non-scaling-stroke;
+    filter: drop-shadow(0 0 1px #000);
+    transition: fill 0.1s, stroke-width 0.1s;
+  }
+  .field-empty { fill: var(--red-fill); stroke: var(--red); }
+  .field-filled { fill: transparent; stroke: var(--green); stroke-width: 3px; }
+  .field.active { stroke-width: 3px; }
+  .field.flash { animation: field-flash 0.6s ease-in-out 2; }
+  @keyframes field-flash { 50% { stroke-width: 5px; } }
+  @media (prefers-reduced-motion: reduce) {
+    .field.flash { animation: none; stroke-width: 4px; }
+  }
+  body.fields-off .field, body.fields-off .fields-block { display: none; }
+  .fields-block { margin: 0 0 12px; }
+  .fields-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 6px;
+  }
+  .fields-title { margin: 0; font-size: 0.95rem; font-weight: 600; }
+  .fields-count { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+  .fields { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .field-item {
+    min-width: 0;
+    padding: 8px 14px;
+    border-radius: 12px;
+    border: 1px dashed var(--border);
+    background: var(--bg);
+    cursor: pointer;
+    outline: none;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .field-item:hover, .field-item:focus-visible, .field-item.active { border-color: var(--hover-border); background: var(--accent-soft); }
+  .field-item.active { border-color: var(--accent); }
+  .field-label { font-weight: 600; }
+  .field-missing { color: var(--red); }
+  .field-unread { color: var(--muted); }
+
+  .lines {
+    list-style: none;
+    margin: 0;
+    padding: 0 4px 0 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    display: grid;
+    gap: 8px;
+  }
+  .line {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .line:hover, .line:focus-visible, .line.active { border-color: var(--hover-border); background: var(--accent-soft); }
+  .line.active { border-color: var(--accent); }
+  .line.has-match { border-color: var(--amber); }
+  .line.copied { border-color: var(--green); }
+  .line-text { font-size: 1rem; overflow-wrap: anywhere; word-break: break-word; }
+  .line-meta {
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .conf { font-weight: 600; }
+  .conf-hi { color: var(--green); }
+  .conf-mid { color: var(--amber); }
+  .conf-lo { color: var(--red); }
+  mark {
+    background: var(--match-fill);
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 1px;
+  }
+  mark.current {
+    background: var(--match-strong);
+    box-shadow: 0 0 0 2px var(--amber);
+  }
+  .empty { color: var(--muted); padding: 10px 14px; }
+
+  /* ---- server jobs (queue for large files, mode choice, my jobs) ---- */
+  .mode-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+  .mode-select {
+    font: inherit;
+    font-size: 0.88rem;
+    min-height: 40px;
+    padding: 6px 14px;
+    border-radius: var(--chip-radius);
+    border: 1px solid var(--border);
+    background: var(--field);
+    color: var(--text);
+    max-width: 60%;
+  }
+  .mode-select:focus {
+    outline: none;
+    border-color: var(--accent-strong);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .notice {
+    margin: 10px 0 0;
+    padding: 8px 14px;
+    border-radius: var(--chip-radius);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 0.85rem;
+  }
+  .jobs-card { margin: 0 0 18px; }
+  .jobs-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .jobs-head h2 { font-size: 1rem; }
+  .jobs-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .job-row {
+    display: grid;
+    gap: 6px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    min-width: 0;
+  }
+  .job-top { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+  .job-name { font-family: var(--mono); font-size: 0.9rem; overflow-wrap: anywhere; min-width: 0; }
+  .job-state { font-size: 0.82rem; color: var(--accent); white-space: nowrap; }
+  .job-state.is-done { color: var(--green); }
+  .job-state.is-failed { color: var(--red); }
+  .job-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+  .job-fill { height: 100%; width: 0; background: var(--accent-strong); transition: width 0.3s; }
+  .job-meta { margin: 0; font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .job-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .job-actions .btn { font-size: 0.82rem; min-height: 32px; padding: 4px 12px; }
+  .btn-link { text-decoration: none; display: inline-block; }
+  @media (prefers-reduced-motion: reduce) { .job-fill { transition: none; } }
+
+  /* ---- responsive ---- */
+  @media (max-width: 899px) {
+    .search-wrap { order: 3; flex: 1 1 100%; max-width: none; margin: 0; }
+    .status-pill { order: 2; }
+  }
+  @media (min-width: 900px) {
+    .navbar { flex-wrap: nowrap; height: var(--nav-h); }
+    .app { display: grid; grid-template-columns: 300px minmax(0, 1fr); align-items: start; }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      width: 300px;
+      height: 100vh;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      border-bottom: 0;
+      padding: 20px 18px;
+    }
+    .main { padding: 28px 32px 56px; }
+  }
+  @media (min-width: 1200px) {
+    body:not(.hide-images) .page-body { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" aria-label="ตัวกรองและเครื่องมือ">
+    <div class="brand">
+      <svg class="logo" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+        <rect class="logo-bg" x="0" y="0" width="28" height="28" rx="7"/>
+        <path class="logo-fg" d="M8 6.5h8.5L20 10v11.5H8z"/>
+        <path class="logo-fg" d="M11 14h6M11 17.5h4.5"/>
+      </svg>
+      <span class="brand-name">OCR trial</span>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button id="tab-main" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-main">หลัก</button>
+      <button id="tab-export" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-export">ส่งออก</button>
+    </div>
+
+    <section id="panel-main" class="panel" role="tabpanel" aria-labelledby="tab-main">
+      <div class="side-section">
+        <input id="file-input" type="file" accept="image/*,.pdf,application/pdf" hidden>
+        <label class="mode-row">
+          <span>โหมดการอ่าน</span>
+          <select id="mode-select" class="mode-select">
+            <option value="auto">อัตโนมัติ</option>
+            <option value="browser">อ่านบนเครื่องนี้</option>
+            <option value="server">ส่งเข้าคิว server</option>
+          </select>
+        </label>
+        <p id="ram-warning" class="notice" role="status" hidden></p>
+      </div>
+
+      <div class="side-section">
+        <h3 class="side-title">หน้า</h3>
+        <div id="page-chips" class="chip-row"></div>
+        <div class="chip-row">
+          <button id="select-all-btn" class="chip" type="button">เลือกทั้งหมด</button>
+          <button id="select-none-btn" class="chip" type="button">ไม่เลือกเลย</button>
+        </div>
+        <p id="pick-status" class="pick-status" aria-live="polite"></p>
+        <div class="range-form">
+          <input id="range-input" class="range-input" type="text" placeholder="เช่น 1-3, 5" aria-label="ช่วงหน้า">
+          <button id="apply-btn" class="btn" type="button">ใช้</button>
+        </div>
+        <p id="range-error" class="range-error" role="alert" hidden></p>
+      </div>
+
+      <div class="side-section">
+        <h3 class="side-title">
+          <span>ความมั่นใจขั้นต่ำ</span>
+          <output id="conf-value" class="conf-value" for="conf-slider">0%</output>
+        </h3>
+        <input id="conf-slider" class="conf-slider" type="range" min="0" max="3" step="1" value="0" aria-label="ความมั่นใจขั้นต่ำ">
+        <div class="ticks" aria-hidden="true"><span>0%</span><span>50%</span><span>70%</span><span>90%</span></div>
+        <p id="hidden-count" class="muted" hidden></p>
+      </div>
+
+      <div class="side-section">
+        <h3 class="side-title">การแสดงผล</h3>
+        <label class="switch-row"><span>แสดงกรอบข้อความ</span><input id="toggle-boxes" class="switch" type="checkbox" checked></label>
+        <label class="switch-row"><span>แสดงช่องกรอกข้อมูล</span><input id="toggle-fields" class="switch" type="checkbox" checked></label>
+        <label class="switch-row"><span>แสดงรูปหน้า</span><input id="toggle-images" class="switch" type="checkbox" checked></label>
+      </div>
+    </section>
+
+    <section id="panel-export" class="panel" role="tabpanel" aria-labelledby="tab-export" hidden>
+      <div class="side-section">
+        <h3 class="side-title">ส่งออก</h3>
+        <button id="copy-btn" class="btn btn-block" type="button" disabled>คัดลอกหน้าที่เลือก</button>
+        <button id="download-btn" class="btn btn-block" type="button" disabled>ดาวน์โหลด .txt</button>
+        <p id="export-summary" class="pick-status"></p>
+        <h3 class="side-title">ชื่อไฟล์ที่จะใช้</h3>
+        <code id="export-name" class="filename"></code>
+      </div>
+    </section>
+
+    <p class="sidebar-foot muted">ทำงานในเบราว์เซอร์ของคุณ ไม่ส่งไฟล์ออกนอกเครื่อง</p>
+  </aside>
+
+  <div class="main-col">
+    <header class="navbar">
+      <div class="search-wrap">
+        <div class="search-box">
+          <input id="search-input" type="search" placeholder="ค้นหาข้อความในผลลัพธ์…" aria-label="ค้นหาข้อความในผลลัพธ์" autocomplete="off">
+          <kbd class="kbd" aria-hidden="true">Ctrl K</kbd>
+        </div>
+        <span id="search-count" class="search-count" aria-live="polite"></span>
+        <button id="prev-btn" class="btn icon-btn" type="button" aria-label="ผลก่อนหน้า" disabled>‹</button>
+        <button id="next-btn" class="btn icon-btn" type="button" aria-label="ผลถัดไป" disabled>›</button>
+      </div>
+
+<div id="dropzone" class="btn btn-primary upload-btn" role="button" tabindex="0" aria-label="อัปโหลดไฟล์ใหม่ หรือลากไฟล์มาวาง"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>อัปโหลด</span></div>
+      <span class="status-pill"><span class="dot" aria-hidden="true"></span><span id="model-pill">กำลังโหลดโมเดล…</span></span>
+      <button id="logout-btn" class="btn" type="button">ออกจากระบบ</button>
+    </header>
+
+    <main class="main">
+      <header class="page-header">
+        <nav aria-label="เส้นทาง">
+          <ol class="crumbs">
+            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></li>
+            <li>เอกสาร</li>
+            <li aria-current="page">อ่านข้อความ</li>
+          </ol>
+        </nav>
+        <h1>อ่านข้อความจากรูปหรือ PDF</h1>
+        <p class="page-sub">ภาษาไทยและอังกฤษ สูงสุด 30 หน้า ไฟล์ละไม่เกิน 50 MB</p>
+      </header>
+
+      <section id="jobs-card" class="card jobs-card" aria-labelledby="jobs-title" hidden>
+        <div class="jobs-head">
+          <h2 id="jobs-title">งานของฉัน</h2>
+          <span id="jobs-count" class="muted"></span>
+        </div>
+        <ul id="jobs-list" class="jobs-list"></ul>
+      </section>
+
+      <div id="empty-state" class="card empty-card">
+        <span class="drop-icon" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 8.5a4.8 4.8 0 0 1-.5 9.5"/><path d="M12 12v8M8.8 15 12 11.8 15.2 15"/></svg></span>
+        <h2 class="empty-heading">เลือกไฟล์ที่จะอ่าน</h2>
+        <p class="empty-sub">PNG, JPG หรือ PDF · ลากมาวาง หรือกด Ctrl+V เพื่อวางรูป</p>
+        <label for="file-input" class="btn btn-primary">เลือกไฟล์ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></label>
+      </div>
+
+      <div id="status" class="status" role="status" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="status-text"></span>
+      </div>
+      <div id="error" class="error" role="alert" hidden></div>
+
+      <header id="result-head" class="result-head" hidden>
+        <div class="result-title">
+          <h2>ผลลัพธ์</h2>
+          <span id="res-count" class="muted"></span>
+        </div>
+        <div class="result-sub">
+          <span id="res-file" class="mono"></span>
+          <span id="res-meta" class="muted"></span>
+        </div>
+      </header>
+
+      <div id="results"></div>
+    </main>
+  </div>
+</div>
+
+<script src="js/jobs_client.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var COPY_SELECTED_LABEL = "คัดลอกหน้าที่เลือก";
+  // The confidence slider has four stops; index 0..3 maps to these thresholds.
+  var STOPS = [0, 0.5, 0.7, 0.9];
+  var dropzone = document.getElementById("dropzone");
+  var fileInput = document.getElementById("file-input");
+  var statusBox = document.getElementById("status");
+  var statusText = document.getElementById("status-text");
+  var errorBox = document.getElementById("error");
+  var results = document.getElementById("results");
+  var emptyState = document.getElementById("empty-state");
+  var resultHead = document.getElementById("result-head");
+  var pageChips = document.getElementById("page-chips");
+  var busy = false;
+
+  // Controls that live in the navbar and sidebar. They exist once, from page load.
+  var ui = {
+    searchInput: document.getElementById("search-input"),
+    countEl: document.getElementById("search-count"),
+    prevBtn: document.getElementById("prev-btn"),
+    nextBtn: document.getElementById("next-btn"),
+    copyBtn: document.getElementById("copy-btn"),
+    downloadBtn: document.getElementById("download-btn"),
+    exportSummary: document.getElementById("export-summary"),
+    exportName: document.getElementById("export-name"),
+    pickStatus: document.getElementById("pick-status"),
+    selectAllBtn: document.getElementById("select-all-btn"),
+    selectNoneBtn: document.getElementById("select-none-btn"),
+    rangeInput: document.getElementById("range-input"),
+    applyBtn: document.getElementById("apply-btn"),
+    rangeError: document.getElementById("range-error"),
+    confSlider: document.getElementById("conf-slider"),
+    confValue: document.getElementById("conf-value"),
+    hiddenCount: document.getElementById("hidden-count"),
+    boxesToggle: document.getElementById("toggle-boxes"),
+    fieldsToggle: document.getElementById("toggle-fields"),
+    imagesToggle: document.getElementById("toggle-images"),
+    resCount: document.getElementById("res-count"),
+    resFile: document.getElementById("res-file"),
+    resMeta: document.getElementById("res-meta")
+  };
+
+  // State for the currently rendered result.
+  var currentData = null;  // the server response
+  var views = [];          // one per page: {page, check, chip, badge, lines, section, svg}
+  var matches = [];        // one entry per visible match: the line record it lives in
+  var current = -1;        // index into matches of the highlighted match
+  var query = "";          // search text, kept across new results
+  var searchTimer = null;
+  var minConf = 0;         // lines below this confidence are hidden
+
+  // Build an HTML element. Strings are always set as text, never as markup.
+  function h(tag, attrs) {
+    var node = document.createElement(tag);
+    var children = Array.prototype.slice.call(arguments, 2);
+    Object.keys(attrs || {}).forEach(function (key) {
+      var value = attrs[key];
+      if (value === undefined || value === null || value === false) return;
+      if (key === "text") node.textContent = value;
+      else if (key === "class") node.className = value;
+      else if (key === "checked") node.checked = !!value;
+      else node.setAttribute(key, value === true ? "" : String(value));
+    });
+    children.forEach(function (c) { if (c) node.appendChild(c); });
+    return node;
+  }
+
+  function tier(conf) {
+    return conf >= 0.9 ? "hi" : conf >= 0.7 ? "mid" : "lo";
+  }
+
+  function flash(btn, message, original) {
+    btn.textContent = message;
+    setTimeout(function () { btn.textContent = original; }, 1600);
+  }
+
+  function setBusy(on) {
+    busy = on;
+    dropzone.classList.toggle("busy", on);
+    dropzone.setAttribute("aria-disabled", on ? "true" : "false");
+    dropzone.tabIndex = on ? -1 : 0;
+  }
+
+  function showError(message) {
+    errorBox.textContent = "เกิดข้อผิดพลาด: " + message;
+    errorBox.hidden = false;
+  }
+
+  function copyLine(text, row) {
+    navigator.clipboard.writeText(text).then(function () {
+      row.classList.add("copied");
+      setTimeout(function () { row.classList.remove("copied"); }, 900);
+    }, function () {});
+  }
+
+  // @logic-begin
+  // Pure helpers, no DOM access. The scratchpad test script runs this exact block.
+  var WS = /\s/;
+
+  // Drop whitespace and lowercase. For every kept character, remember the index
+  // of the original character it came from so match positions can be mapped back.
+  function normalizeWithMap(s) {
+    var out = "";
+    var map = [];
+    for (var i = 0; i < s.length; i++) {
+      var ch = s.charAt(i);
+      if (WS.test(ch)) continue;
+      var lower = ch.toLowerCase();
+      for (var k = 0; k < lower.length; k++) {
+        out += lower.charAt(k);
+        map.push(i);
+      }
+    }
+    return { text: out, map: map };
+  }
+
+  // All non-overlapping matches of query in lineText, as [start, end) indexes
+  // into the original lineText. Whitespace is ignored on both sides.
+  function findMatches(lineText, query) {
+    var needle = normalizeWithMap(query).text;
+    if (!needle) return [];
+    var hay = normalizeWithMap(lineText);
+    var found = [];
+    var at = hay.text.indexOf(needle);
+    while (at !== -1) {
+      var start = hay.map[at];
+      var end = hay.map[at + needle.length - 1] + 1;
+      // Keep trailing combining marks (Thai vowels and tone marks) with their base.
+      while (end < lineText.length && /^\p{M}/u.test(lineText.slice(end, end + 2))) end++;
+      // Lowercasing can expand one character into two; skip matches that overlap the previous one.
+      if (!found.length || start >= found[found.length - 1].end) {
+        found.push({ start: start, end: end });
+      }
+      at = hay.text.indexOf(needle, at + needle.length);
+    }
+    return found;
+  }
+
+  // Thai digits, full-width digits and dash variants -> ASCII digits and "-".
+  function normalizeRangeText(s) {
+    return s.replace(/[๐-๙０-９]/g, function (ch) {
+      var code = ch.charCodeAt(0);
+      return String.fromCharCode(code <= 0x0E59 ? code - 0xE50 + 48 : code - 0xFF10 + 48);
+    }).replace(/[–—−－]/g, "-");
+  }
+
+  // "1-3, 5" -> [1,2,3,5]. Reversed ranges are swapped, numbers outside 1..total
+  // are ignored. Returns null when the text is not a valid list.
+  function parsePageRange(text, total) {
+    var parts = normalizeRangeText(String(text)).split(",");
+    var seen = {};
+    var valid = 0;
+    for (var i = 0; i < parts.length; i++) {
+      var t = parts[i].replace(/\s+/g, "");
+      if (t === "") continue;
+      var m = /^(\d+)(?:-(\d+))?$/.exec(t);
+      if (!m) return null;
+      var a = parseInt(m[1], 10);
+      var b = m[2] === undefined ? a : parseInt(m[2], 10);
+      if (a > b) { var tmp = a; a = b; b = tmp; }
+      valid++;
+      for (var p = Math.max(1, a); p <= Math.min(total, b); p++) seen[p] = true;
+    }
+    if (!valid) return null;
+    var pages = [];
+    for (var n = 1; n <= total; n++) if (seen[n]) pages.push(n);
+    return pages;
+  }
+
+  // [1,2,3,5] -> "1-3_5"
+  function compactRanges(pages) {
+    var sorted = pages.slice().sort(function (x, y) { return x - y; })
+      .filter(function (v, idx, arr) { return idx === 0 || v !== arr[idx - 1]; });
+    var parts = [];
+    var i = 0;
+    while (i < sorted.length) {
+      var j = i;
+      while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+      parts.push(j > i ? sorted[i] + "-" + sorted[j] : String(sorted[i]));
+      i = j + 1;
+    }
+    return parts.join("_");
+  }
+
+  // All pages selected -> "<name>.txt"; otherwise "<name>.p<ranges>.txt".
+  function downloadName(filename, pages, total) {
+    if (pages.length === total) return filename + ".txt";
+    return filename + ".p" + compactRanges(pages) + ".txt";
+  }
+  // @logic-end
+
+  // Rebuild a line's text node content: plain text, or text with <mark> spans.
+  function paintText(el, text, ranges) {
+    el.replaceChildren();
+    if (!ranges.length) {
+      el.textContent = text;
+      return;
+    }
+    var pos = 0;
+    ranges.forEach(function (r) {
+      if (r.start > pos) el.appendChild(document.createTextNode(text.slice(pos, r.start)));
+      el.appendChild(h("mark", { class: r.current ? "current" : null, text: text.slice(r.start, r.end) }));
+      pos = r.end;
+    });
+    if (pos < text.length) el.appendChild(document.createTextNode(text.slice(pos)));
+  }
+
+  function dot() {
+    return h("span", { class: "sep", "aria-hidden": "true", text: "•" });
+  }
+
+  function renderPage(page) {
+    var svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", "overlay");
+    if (page.width && page.height) svg.setAttribute("viewBox", "0 0 " + page.width + " " + page.height);
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("aria-hidden", "true");
+
+    var list = h("ul", { class: "lines" });
+    var view = { page: page, lines: [], check: null, chip: null, badge: null, section: null, svg: svg };
+
+    page.lines.forEach(function (line, idx) {
+      var t = tier(line.confidence);
+
+      var poly = document.createElementNS(SVG_NS, "polygon");
+      poly.setAttribute("points", line.box.map(function (p) { return p[0] + "," + p[1]; }).join(" "));
+      poly.setAttribute("class", "box box-" + t);
+      svg.appendChild(poly);
+
+      var textEl = h("span", { class: "line-text", text: line.text });
+      var row = h("li", { class: "line", tabindex: "0", title: "คลิกเพื่อคัดลอกบรรทัดนี้" },
+        textEl,
+        h("span", { class: "line-meta" },
+          h("span", { text: "หน้า " + page.number + " • บรรทัด " + (idx + 1) + " • ความมั่นใจ " }),
+          h("span", { class: "conf conf-" + t, text: Math.round(line.confidence * 100) + "%" })));
+      list.appendChild(row);
+
+      var rec = { line: line, row: row, textEl: textEl, poly: poly, ranges: [] };
+      view.lines.push(rec);
+
+      function setActive(on) {
+        row.classList.toggle("active", on);
+        poly.classList.toggle("active", on);
+      }
+      row.addEventListener("mouseenter", function () { setActive(true); });
+      row.addEventListener("mouseleave", function () { setActive(false); });
+      row.addEventListener("focus", function () { setActive(true); });
+      row.addEventListener("blur", function () { setActive(false); });
+      row.addEventListener("click", function () { copyLine(line.text, row); });
+      row.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          copyLine(line.text, row);
+        }
+      });
+      poly.addEventListener("mouseenter", function () {
+        setActive(true);
+        row.scrollIntoView({ block: "nearest" });
+      });
+      poly.addEventListener("mouseleave", function () { setActive(false); });
+    });
+
+    // Blank form fields: dashed boxes drawn after the line boxes (so they sit on top),
+    // listed in a block above the lines. Server-mode results have no fields.
+    var fields = page.fields || [];
+    var fieldsBlock = null;
+    var fieldList = h("ul", { class: "fields" });
+    var emptyCount = 0;
+    fields.forEach(function (field, idx) {
+      var poly = document.createElementNS(SVG_NS, "polygon");
+      poly.setAttribute("points", field.box.map(function (p) { return p[0] + "," + p[1]; }).join(" "));
+      poly.setAttribute("class", "field " + (field.filled ? "field-filled" : "field-empty"));
+      svg.appendChild(poly);
+      if (!field.filled) emptyCount++;
+
+      var valueText = !field.filled ? "ยังไม่ได้กรอก" : field.value ? field.value : "กรอกแล้ว (อ่านไม่ออก)";
+      var valueClass = !field.filled ? "field-missing" : field.value ? "" : "field-unread";
+      var item = h("li", { class: "field-item", tabindex: "0", title: "คลิกเพื่อดูช่องนี้ในภาพ" },
+        h("span", { class: "field-label", text: field.label || "ช่องที่ " + (idx + 1) }),
+        h("span", { text: ": " }),
+        h("span", { class: valueClass, text: valueText }));
+      fieldList.appendChild(item);
+
+      var flashTimer = null;
+      function setFieldActive(on) {
+        item.classList.toggle("active", on);
+        poly.classList.toggle("active", on);
+      }
+      function jumpToField() {
+        var target = svg.parentNode;
+        if (target && target.scrollIntoView) target.scrollIntoView({ block: "center" });
+        poly.classList.remove("flash");
+        void poly.getBoundingClientRect();
+        poly.classList.add("flash");
+        clearTimeout(flashTimer);
+        flashTimer = setTimeout(function () { poly.classList.remove("flash"); }, 1200);
+      }
+      item.addEventListener("mouseenter", function () { setFieldActive(true); });
+      item.addEventListener("mouseleave", function () { setFieldActive(false); });
+      item.addEventListener("focus", function () { setFieldActive(true); });
+      item.addEventListener("blur", function () { setFieldActive(false); });
+      item.addEventListener("click", jumpToField);
+      item.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          jumpToField();
+        }
+      });
+      poly.addEventListener("mouseenter", function () {
+        setFieldActive(true);
+        item.scrollIntoView({ block: "nearest" });
+      });
+      poly.addEventListener("mouseleave", function () { setFieldActive(false); });
+    });
+    if (fields.length) {
+      fieldsBlock = h("div", { class: "fields-block" },
+        h("div", { class: "fields-head" },
+          h("h3", { class: "fields-title", text: "ช่องกรอกข้อมูล" }),
+          h("span", { class: "fields-count", text: "ว่าง " + emptyCount + " จาก " + fields.length + " ช่อง" })),
+        fieldList);
+    }
+
+    if (!page.lines.length) {
+      var emptyText = page.error ? "อ่านหน้านี้ไม่สำเร็จ: " + page.error : "ไม่พบข้อความในหน้านี้";
+      list.appendChild(h("li", { class: "empty", text: emptyText }));
+    }
+
+    // The checkbox is the state behind the page chip. It is not shown.
+    view.check = h("input", { type: "checkbox", checked: true });
+    view.chip = h("button", { class: "chip", type: "button", "aria-pressed": "true" },
+      h("span", { class: "chip-check", "aria-hidden": "true", text: "✓" }),
+      h("span", { text: "หน้า " + page.number }));
+    view.chip.addEventListener("click", function () {
+      view.check.checked = !view.check.checked;
+      updatePickUI();
+    });
+    view.badge = h("span", { class: "match-badge", hidden: true });
+
+    // Failed pages have no image or size (server error pages): show the text part only.
+    var hasSize = !!(page.width && page.height);
+    var figure = h("div", { class: "figure" },
+      page.image ? h("img", { src: page.image, alt: "หน้า " + page.number, loading: "lazy", decoding: "async" }) : null,
+      hasSize ? svg : null);
+
+    view.section = h("section", { class: "card page-card" },
+      h("div", { class: "page-head" },
+        h("h2", { class: "page-title", text: "หน้า " + page.number }),
+        h("p", { class: "page-meta" },
+          h("span", { text: page.lines.length + " บรรทัด" }), dot(),
+          h("span", { text: (page.seconds || 0).toFixed(2) + " วินาที" }), dot(),
+          view.badge)),
+      h("div", { class: "page-body" },
+        h("div", { class: "col-image" }, figure),
+        h("div", { class: "col-lines" }, fieldsBlock, list)));
+    return view;
+  }
+
+  // ---- page selection ----
+
+  function selectedViews() {
+    return views.filter(function (v) { return v.check.checked; });
+  }
+
+  // Text of the checked pages. When every page is checked, use the server's full text.
+  function selectedText() {
+    var picked = selectedViews();
+    if (picked.length === views.length) return currentData.text;
+    return picked.map(function (v) { return v.page.text; }).join("\n\n");
+  }
+
+  function updatePickUI() {
+    var picked = selectedViews();
+    var n = picked.length;
+    views.forEach(function (v) {
+      v.chip.classList.toggle("selected", v.check.checked);
+      v.chip.setAttribute("aria-pressed", v.check.checked ? "true" : "false");
+    });
+    var summary = currentData ? "เลือก " + n + " จาก " + views.length + " หน้า" : "";
+    ui.pickStatus.textContent = summary;
+    ui.exportSummary.textContent = summary;
+    ui.exportName.textContent = currentData && n
+      ? downloadName(currentData.filename, picked.map(function (v) { return v.page.number; }), views.length)
+      : "";
+    ui.copyBtn.disabled = n === 0;
+    ui.downloadBtn.disabled = n === 0;
+  }
+
+  function setAllChecked(on) {
+    views.forEach(function (v) { v.check.checked = on; });
+    updatePickUI();
+  }
+
+  function applyRange() {
+    if (!views.length) return;
+    var pages = parsePageRange(ui.rangeInput.value, views.length);
+    if (pages === null) {
+      ui.rangeError.textContent = "รูปแบบไม่ถูกต้อง";
+      ui.rangeError.hidden = false;
+      return;
+    }
+    if (pages.length === 0) {
+      ui.rangeError.textContent = "ไม่มีหน้าที่ตรงกับช่วงที่ระบุ";
+      ui.rangeError.hidden = false;
+      return;
+    }
+    ui.rangeError.hidden = true;
+    views.forEach(function (v) { v.check.checked = pages.indexOf(v.page.number) !== -1; });
+    updatePickUI();
+  }
+
+  // ---- search and confidence filter ----
+
+  // Re-applies the query and the confidence threshold. Lines below the
+  // threshold are hidden (row and polygon), and their matches are not counted.
+  // Compare on the rounded percent the row displays, so a line shown as
+  // "90%" is never hidden by the 90% stop.
+  function shown(rec) {
+    return Math.round(rec.line.confidence * 100) >= Math.round(minConf * 100);
+  }
+
+  function runSearch() {
+    matches = [];
+    var hiddenLines = 0;
+    views.forEach(function (view) {
+      view.lines.forEach(function (rec) {
+        var visible = shown(rec);
+        if (!visible) hiddenLines++;
+        rec.ranges = visible ? findMatches(rec.line.text, query).map(function (m) {
+          matches.push(rec);
+          return { start: m.start, end: m.end, index: matches.length - 1, current: false };
+        }) : [];
+      });
+    });
+
+    if (!matches.length) current = -1;
+    else if (current < 0 || current >= matches.length) current = 0;
+
+    views.forEach(function (view) {
+      var count = 0;
+      view.lines.forEach(function (rec) {
+        var show = shown(rec);
+        var on = rec.ranges.length > 0;
+        rec.row.hidden = !show;
+        rec.poly.classList.toggle("filtered", !show);
+        rec.row.classList.toggle("has-match", on);
+        rec.poly.classList.toggle("has-match", on);
+        rec.ranges.forEach(function (r) { r.current = r.index === current; });
+        rec.poly.classList.toggle("current", rec.ranges.some(function (r) { return r.current; }));
+        paintText(rec.textEl, rec.line.text, rec.ranges);
+        count += rec.ranges.length;
+      });
+      view.badge.textContent = "พบ " + count;
+      view.badge.hidden = count === 0;
+    });
+
+    var hasNeedle = normalizeWithMap(query).text !== "";
+    ui.countEl.textContent = !hasNeedle ? "" : matches.length ? (current + 1) + " / " + matches.length : "ไม่พบ";
+    ui.prevBtn.disabled = matches.length === 0;
+    ui.nextBtn.disabled = matches.length === 0;
+
+    ui.hiddenCount.textContent = "ซ่อน " + hiddenLines + " บรรทัด";
+    ui.hiddenCount.hidden = hiddenLines === 0;
+  }
+
+  function focusCurrent() {
+    if (current < 0) return;
+    matches[current].row.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  function applyQuery() {
+    query = ui.searchInput.value;
+    current = 0;
+    runSearch();
+    focusCurrent();
+  }
+
+  function step(delta) {
+    if (!matches.length) return;
+    current = (current + delta + matches.length) % matches.length;
+    runSearch();
+    focusCurrent();
+  }
+
+  function clearResults() {
+    clearTimeout(searchTimer);
+    searchTimer = null;
+    results.replaceChildren();
+    pageChips.replaceChildren();
+    resultHead.hidden = true;
+    currentData = null;
+    views = [];
+    matches = [];
+    current = -1;
+    ui.countEl.textContent = "";
+    ui.prevBtn.disabled = true;
+    ui.nextBtn.disabled = true;
+    ui.hiddenCount.hidden = true;
+    ui.rangeError.hidden = true;
+    updatePickUI();
+  }
+
+  function renderResult(data) {
+    clearTimeout(searchTimer);
+    searchTimer = null;
+    results.replaceChildren();
+    pageChips.replaceChildren();
+    emptyState.hidden = true;
+    currentData = data;
+    views = [];
+    matches = [];
+    current = -1;
+    var total = data.pages.reduce(function (sum, p) { return sum + (p.seconds || 0); }, 0);
+    var lineCount = data.pages.reduce(function (n, p) { return n + p.lines.length; }, 0);
+
+    ui.resCount.textContent = lineCount + " บรรทัด";
+    ui.resFile.textContent = data.filename;
+    ui.resMeta.textContent = data.pages.length + " หน้า · " + total.toFixed(2) + " วินาที";
+    resultHead.hidden = false;
+
+    data.pages.forEach(function (page) {
+      var view = renderPage(page);
+      views.push(view);
+      pageChips.appendChild(view.chip);
+      results.appendChild(view.section);
+    });
+
+    updatePickUI();
+    runSearch();
+  }
+
+  // ---- OCR worker (js/worker.js) and page decoding, all in the browser ----
+
+  var DECODE_ERROR = "ไฟล์นี้ไม่ใช่รูปภาพหรือ PDF ที่อ่านได้";
+  var PDF_SCALE = 200 / 72;
+  var MAX_LONG_SIDE = 4000;
+  var MAX_PIXELS = 16000000;
+  var OCR_TIMEOUT_MS = 120000;
+  var TIMEOUT_ERROR = "การอ่านหน้านี้ใช้เวลานานเกินไป โปรดรีโหลดหน้า";
+  var STOPPED_ERROR = "ตัวประมวลผลหยุดทำงาน โปรดรีโหลดหน้า";
+  var PILL_READY = "โมเดลพร้อม";
+  var PILL_FAILED = "โหลดโมเดลไม่สำเร็จ";
+  var modelPill = document.getElementById("model-pill");
+  var modelReady = false;
+  var worker = null;
+  var nextJobId = 1;
+  var jobs = new Map();
+  var readyResolve;
+  var readyReject;
+  var ready = new Promise(function (resolve, reject) {
+    readyResolve = resolve;
+    readyReject = reject;
+  });
+  ready.catch(function () {}); // each upload that awaits it reports the failure
+
+  // Ends the worker: every waiting job and the ready wait get err. The page must be reloaded.
+  function stopWorker(err) {
+    readyReject(err);
+    jobs.forEach(function (job) { job.reject(err); });
+    jobs.clear();
+    if (worker) worker.terminate();
+    worker = null;
+    if (!busy) {
+      statusBox.hidden = true;
+      showError(err.message);
+    }
+  }
+
+  function failLoad(message) {
+    modelPill.textContent = PILL_FAILED;
+    stopWorker(new Error(modelReady
+      ? STOPPED_ERROR + ": " + message
+      : "โหลดโมเดลไม่สำเร็จ: " + message));
+  }
+
+  function startWorker() {
+    worker = new Worker("js/worker.js");
+    worker.onmessage = function (e) {
+      var msg = e.data;
+      if (msg.type === "ready") {
+        modelReady = true;
+        modelPill.textContent = PILL_READY;
+        readyResolve();
+        if (!busy) statusBox.hidden = true;
+      } else if (msg.type === "error" && msg.id === null) {
+        failLoad(msg.message);
+      } else {
+        var job = jobs.get(msg.id);
+        if (!job) return;
+        jobs.delete(msg.id);
+        if (msg.type === "result") job.resolve(msg);
+        else job.reject(new Error(msg.message));
+      }
+    };
+    worker.onerror = function (e) {
+      failLoad(e.message || "worker error");
+    };
+  }
+
+  function ocrPage(width, height, rgba) {
+    return new Promise(function (resolve, reject) {
+      if (!worker) {
+        reject(new Error(STOPPED_ERROR));
+        return;
+      }
+      var id = nextJobId++;
+      // A page that hangs would keep the UI busy forever: stop the worker and fail the job.
+      var timer = setTimeout(function () {
+        stopWorker(new Error(TIMEOUT_ERROR));
+      }, OCR_TIMEOUT_MS);
+      jobs.set(id, {
+        resolve: function (value) { clearTimeout(timer); resolve(value); },
+        reject: function (err) { clearTimeout(timer); reject(err); }
+      });
+      worker.postMessage({ type: "ocr", id: id, width: width, height: height, rgba: rgba }, [rgba]);
+    });
+  }
+
+  // White-backed canvas (integer size): transparent pixels would otherwise read as black.
+  function makeCanvas(width, height) {
+    var canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, width, height);
+    return canvas;
+  }
+
+  // Factor (at most 1) that keeps the long side <= MAX_LONG_SIDE and the area <= MAX_PIXELS.
+  function fitScale(width, height) {
+    return Math.min(1, MAX_LONG_SIDE / Math.max(width, height), Math.sqrt(MAX_PIXELS / (width * height)));
+  }
+
+  // Resolves to {count, render(i), close()}: images are one page, PDF pages render on demand.
+  async function openSource(file) {
+    var head = await file.slice(0, 4).text();
+    if (/\.pdf$/i.test(file.name || "") || head === "%PDF") {
+      var pdfjs = await import("./vendor/pdf.min.mjs");
+      pdfjs.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
+      // destroy() lives on the loading task in this pdfjs version, not on the document.
+      var task = pdfjs.getDocument({
+        data: new Uint8Array(await file.arrayBuffer()),
+        isEvalSupported: false,
+        enableXfa: false
+      });
+      var doc = await task.promise;
+      return {
+        count: doc.numPages,
+        render: async function (i) {
+          var page = await doc.getPage(i + 1);
+          try {
+            // Clamp the render scale per page so the canvas stays within the pixel caps.
+            var base = page.getViewport({ scale: 1 });
+            var scale = PDF_SCALE * fitScale(base.width * PDF_SCALE, base.height * PDF_SCALE);
+            var viewport = page.getViewport({ scale: scale });
+            var canvas = makeCanvas(Math.floor(viewport.width), Math.floor(viewport.height));
+            await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
+            return canvas;
+          } finally {
+            page.cleanup();
+          }
+        },
+        close: function () { task.destroy().catch(function () {}); }
+      };
+    }
+    var bitmap = await createImageBitmap(file);
+    var s = fitScale(bitmap.width, bitmap.height);
+    var width = Math.max(1, Math.floor(bitmap.width * s));
+    var height = Math.max(1, Math.floor(bitmap.height * s));
+    var canvas = makeCanvas(width, height);
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, width, height);
+    if (bitmap.close) bitmap.close();
+    return { count: 1, render: async function () { return canvas; }, close: function () {} };
+  }
+
+  // Builds the same object as web_app.run_ocr: {filename, text, pages[]}.
+  async function runUpload(file, name) {
+    await ready;
+    var source;
+    try {
+      source = await openSource(file);
+    } catch (err) {
+      throw new Error(DECODE_ERROR);
+    }
+    try {
+      var pages = [];
+      for (var i = 0; i < source.count; i++) {
+        statusText.textContent = "กำลังอ่าน " + name + " หน้า " + (i + 1) + "/" + source.count + " …";
+        var canvas, rgba, image;
+        try {
+          canvas = await source.render(i);
+          rgba = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data.buffer;
+          image = canvas.toDataURL("image/jpeg", 0.85);
+        } catch (err) {
+          throw new Error(DECODE_ERROR);
+        }
+        var out = await ocrPage(canvas.width, canvas.height, rgba);
+        pages.push({
+          number: i + 1,
+          width: canvas.width,
+          height: canvas.height,
+          seconds: out.seconds,
+          image: image,
+          text: out.text,
+          lines: out.lines,
+          fields: out.fields || []
+        });
+      }
+      return {
+        filename: name,
+        text: pages.map(function (p) { return p.text; }).join("\n\n"),
+        pages: pages
+      };
+    } finally {
+      source.close();
+    }
+  }
+
+  // Mode choice (server jobs block below): the file is read here or queued on the server.
+  function upload(file) {
+    if (busy) return;
+    var name = file.name || "clipboard.png";
+    var choice = readMode();
+    setBusy(true);
+    errorBox.hidden = true;
+    ramWarning.hidden = true;
+    emptyState.hidden = true;
+    statusText.textContent = "กำลังตรวจสอบ " + name + " …";
+    statusBox.hidden = false;
+
+    return planUpload(file, choice).then(function (plan) {
+      if (plan.mode === "server") return submitToServer(file, name);
+      showRamWarning(plan.pages);
+      clearResults();
+      statusText.textContent = modelReady ? "กำลังอ่าน " + name + " …" : "กำลังโหลดโมเดล…";
+      return runUpload(file, name).then(function (data) {
+        renderResult(data);
+      });
+    }).catch(function (err) {
+      showError(err.message);
+    }).then(function () {
+      statusBox.hidden = true;
+      if (!currentData) emptyState.hidden = false;
+      setBusy(false);
+    });
+  }
+
+  statusText.textContent = "กำลังโหลดโมเดล…";
+  statusBox.hidden = false;
+  try {
+    startWorker();
+  } catch (err) {
+    failLoad(err.message);
+  }
+
+  // ---- wiring (once, the controls are static) ----
+
+  ui.searchInput.addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () {
+      searchTimer = null;
+      applyQuery();
+    }, 150);
+  });
+  ui.searchInput.addEventListener("keydown", function (e) {
+    var composing = e.isComposing || e.keyCode === 229;
+    if (e.key !== "Enter" || composing) return;
+    e.preventDefault();
+    if (searchTimer !== null) {
+      clearTimeout(searchTimer);
+      searchTimer = null;
+      applyQuery();
+      return;
+    }
+    step(e.shiftKey ? -1 : 1);
+  });
+  ui.prevBtn.addEventListener("click", function () { step(-1); });
+  ui.nextBtn.addEventListener("click", function () { step(1); });
+
+  document.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && typeof e.key === "string" && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      ui.searchInput.focus();
+      ui.searchInput.select();
+    }
+  });
+
+  var tabs = [document.getElementById("tab-main"), document.getElementById("tab-export")];
+  var panels = [document.getElementById("panel-main"), document.getElementById("panel-export")];
+  tabs.forEach(function (tab, i) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (t, j) {
+        var on = i === j;
+        t.classList.toggle("active", on);
+        t.setAttribute("aria-selected", on ? "true" : "false");
+        panels[j].hidden = !on;
+      });
+    });
+  });
+
+  ui.copyBtn.addEventListener("click", function () {
+    if (!selectedViews().length) return;
+    navigator.clipboard.writeText(selectedText()).then(function () {
+      flash(ui.copyBtn, "คัดลอกแล้ว ✓", COPY_SELECTED_LABEL);
+    }, function () {
+      flash(ui.copyBtn, "คัดลอกไม่สำเร็จ", COPY_SELECTED_LABEL);
+    });
+  });
+
+  ui.downloadBtn.addEventListener("click", function () {
+    var picked = selectedViews();
+    if (!picked.length) return;
+    var blob = new Blob([selectedText()], { type: "text/plain;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var name = downloadName(currentData.filename, picked.map(function (v) { return v.page.number; }), currentData.pages.length);
+    var a = h("a", { href: url, download: name });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  });
+
+  ui.selectAllBtn.addEventListener("click", function () { setAllChecked(true); });
+  ui.selectNoneBtn.addEventListener("click", function () { setAllChecked(false); });
+  ui.applyBtn.addEventListener("click", applyRange);
+  ui.rangeInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.isComposing) {
+      e.preventDefault();
+      applyRange();
+    }
+  });
+  ui.rangeInput.addEventListener("input", function () { ui.rangeError.hidden = true; });
+
+  ui.confSlider.addEventListener("input", function () {
+    minConf = STOPS[parseInt(ui.confSlider.value, 10)] || 0;
+    ui.confValue.textContent = Math.round(minConf * 100) + "%";
+    // Stay on the same match if it survives; else the next visible one after it.
+    var prev = current >= 0 ? matches[current] : null;
+    var prevAt = current;
+    runSearch();
+    if (prev && matches.length) {
+      var same = matches.indexOf(prev);
+      if (same < 0) {
+        // Old index counted hidden matches too; first survivor at or after it.
+        current = Math.min(prevAt, matches.length - 1);
+        runSearch();
+      } else if (same !== current) {
+        current = same;
+        runSearch();
+      }
+      focusCurrent();
+    }
+  });
+
+  ui.boxesToggle.addEventListener("change", function () {
+    document.body.classList.toggle("boxes-off", !ui.boxesToggle.checked);
+  });
+  ui.fieldsToggle.addEventListener("change", function () {
+    document.body.classList.toggle("fields-off", !ui.fieldsToggle.checked);
+  });
+  ui.imagesToggle.addEventListener("change", function () {
+    document.body.classList.toggle("hide-images", !ui.imagesToggle.checked);
+  });
+
+  updatePickUI();
+
+  dropzone.addEventListener("click", function () {
+    if (!busy) fileInput.click();
+  });
+  dropzone.addEventListener("keydown", function (e) {
+    if ((e.key === "Enter" || e.key === " ") && !busy) {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
+  ["dragenter", "dragover"].forEach(function (type) {
+    dropzone.addEventListener(type, function (e) {
+      e.preventDefault();
+      if (!busy) dropzone.classList.add("drag");
+    });
+  });
+  dropzone.addEventListener("dragleave", function () {
+    dropzone.classList.remove("drag");
+  });
+  // Shared drop path: the sidebar dropzone and the empty-state hero both feed files here.
+  function acceptDroppedFile(e) {
+    if (busy) return;
+    var file = e.dataTransfer.files[0];
+    if (file) upload(file);
+  }
+  dropzone.addEventListener("drop", function (e) {
+    e.preventDefault();
+    dropzone.classList.remove("drag");
+    acceptDroppedFile(e);
+  });
+  emptyState.addEventListener("dragenter", function (e) {
+    e.preventDefault();
+    if (!busy) emptyState.classList.add("drag");
+  });
+  emptyState.addEventListener("dragover", function (e) {
+    e.preventDefault();
+    if (!busy) emptyState.classList.add("drag");
+  });
+  emptyState.addEventListener("dragleave", function () {
+    emptyState.classList.remove("drag");
+  });
+  emptyState.addEventListener("drop", function (e) {
+    e.preventDefault();
+    emptyState.classList.remove("drag");
+    acceptDroppedFile(e);
+  });
+  // Stop the browser from opening a file dropped outside the drop zone.
+  window.addEventListener("dragover", function (e) { e.preventDefault(); });
+  window.addEventListener("drop", function (e) { e.preventDefault(); });
+
+  fileInput.addEventListener("change", function () {
+    var file = fileInput.files[0];
+    fileInput.value = "";
+    if (file) upload(file);
+  });
+
+  document.addEventListener("paste", function (e) {
+    if (busy || !e.clipboardData) return;
+    var items = Array.prototype.slice.call(e.clipboardData.items || []);
+    var item = items.find(function (it) { return it.kind === "file" && it.type.indexOf("image/") === 0; });
+    if (!item) return;
+    e.preventDefault();
+    var file = item.getAsFile();
+    if (file) upload(file);
+  });
+  // ---- server jobs: mode choice, chunked upload to the queue, "my jobs" panel ----
+  // Pure helpers (decideMode, chunkRanges, formatEta, formatBytes) live in js/jobs_client.js.
+
+  var BROWSER_MAX_BYTES = 50 * 1024 * 1024;
+  var BROWSER_MAX_PAGES = 30;
+  var CHUNK_RETRIES = 3;
+  var MODE_KEY = "ocr-mode";
+  var SESSION_ERROR = "กรุณาเข้าสู่ระบบ";
+  var ACTIVE_STATES = ["uploading", "queued", "running"];
+  var STATE_LABELS = {
+    uploading: "กำลังอัปโหลด",
+    queued: "รอคิว",
+    running: "กำลังอ่าน",
+    done: "เสร็จ",
+    failed: "ล้มเหลว",
+    cancelled: "ยกเลิก"
+  };
+  var POLL_ACTIVE_MS = 5000;
+  var POLL_IDLE_MS = 60000;
+
+  var modeSelect = document.getElementById("mode-select");
+  var ramWarning = document.getElementById("ram-warning");
+  var jobsCard = document.getElementById("jobs-card");
+  var jobsList = document.getElementById("jobs-list");
+  var jobsCount = document.getElementById("jobs-count");
+  var logoutBtn = document.getElementById("logout-btn");
+  var jobRows = new Map();   // job id -> row record (see createJobRow)
+  var knownStates = null;    // job id -> state at the previous poll; null before the first poll
+  var sharedJobId = null;    // job opened from ?job=, shown even when it is not in this user's list
+  var pollTimer = null;
+  var jobsInFlight = null;   // promise of the poll in progress
+  var jobsAgain = false;     // a refresh was asked for while a poll was in progress
+  var notifyAsked = false;
+
+  function readMode() {
+    var value = null;
+    try { value = localStorage.getItem(MODE_KEY); } catch (err) {}
+    return value === "browser" || value === "server" ? value : "auto";
+  }
+
+  function saveMode(value) {
+    try { localStorage.setItem(MODE_KEY, value); } catch (err) {}
+  }
+
+  function showRamWarning(pages) {
+    var long = pages !== null && pages > BROWSER_MAX_PAGES;
+    ramWarning.hidden = !long;
+    if (long) {
+      ramWarning.textContent = "ไฟล์ยาว " + pages + " หน้า อาจใช้ RAM มากและต้องเปิดแท็บค้างไว้จนเสร็จ";
+    }
+  }
+
+  function countPages(file) {
+    return openSource(file).then(function (source) {
+      var count = source.count;
+      source.close();
+      return count;
+    });
+  }
+
+  // Resolves to {mode: "browser" | "server", pages: number | null}.
+  function planUpload(file, choice) {
+    if (choice === "server") return Promise.resolve({ mode: "server", pages: null });
+    if (choice === "auto" && file.size > BROWSER_MAX_BYTES) {
+      return Promise.resolve({ mode: "server", pages: null });
+    }
+    return countPages(file).then(function (pages) {
+      var mode = choice === "browser" ? "browser" : JobsClient.decideMode(file.size, pages);
+      return { mode: mode, pages: pages };
+    }, function () {
+      // Not readable here: the browser path reports the usual decode error.
+      return { mode: "browser", pages: null };
+    });
+  }
+
+  function sessionExpired() {
+    location.href = "/login.html?next=" + encodeURIComponent(location.pathname + location.search);
+    return new Error(SESSION_ERROR);
+  }
+
+  // JSON API call. A 401 sends the user to the login page.
+  async function api(method, url, body) {
+    var opts = { method: method, credentials: "same-origin", cache: "no-store" };
+    if (body !== undefined) {
+      opts.headers = { "Content-Type": "application/json" };
+      opts.body = JSON.stringify(body);
+    }
+    var res = await fetch(url, opts);
+    if (res.status === 401) throw sessionExpired();
+    var data = null;
+    try { data = await res.json(); } catch (err) {}
+    if (!res.ok) throw new Error((data && data.error) || ("HTTP " + res.status));
+    return data;
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  // The server's JSON error message when there is one, else the status code.
+  async function errorText(res) {
+    try {
+      var data = await res.json();
+      if (data && data.error) return data.error;
+    } catch (err) {}
+    return "HTTP " + res.status;
+  }
+
+  // One chunk. Network errors, 408, 429 and 5xx are retried (waits of 1, 2, 4 s); any other
+  // failure stops at once with the server's message. The same index overwrites on the server.
+  async function putChunk(jobId, index, blob) {
+    var lastError = null;
+    for (var attempt = 0; attempt <= CHUNK_RETRIES; attempt++) {
+      if (attempt > 0) await sleep(JobsClient.chunkRetryDelayMs(attempt - 1));
+      var res;
+      try {
+        res = await fetch("/api/jobs/" + encodeURIComponent(jobId) + "/chunks/" + index, {
+          method: "PUT",
+          credentials: "same-origin",
+          body: blob
+        });
+      } catch (err) {
+        lastError = err;  // network failure: retry
+        continue;
+      }
+      if (res.status === 401) throw sessionExpired();
+      if (res.ok) return;
+      lastError = new Error(await errorText(res));
+      if (!JobsClient.isRetryableStatus(res.status)) break;
+    }
+    throw new Error("อัปโหลดชิ้นที่ " + (index + 1) + " ไม่สำเร็จ: " + lastError.message);
+  }
+
+  async function submitToServer(file, name) {
+    statusText.textContent = "กำลังเริ่มอัปโหลด " + name + " …";
+    var created = await api("POST", "/api/jobs", { filename: name, size: file.size });
+    var jobId = created.job.id;
+    var ranges = JobsClient.chunkRanges(file.size, created.chunk_size);
+    for (var i = 0; i < ranges.length; i++) {
+      statusText.textContent = "กำลังอัปโหลด " + (i + 1) + " / " + ranges.length;
+      await putChunk(jobId, i, file.slice(ranges[i][0], ranges[i][1]));
+    }
+    statusText.textContent = "กำลังส่งเข้าคิว …";
+    await api("POST", "/api/jobs/" + encodeURIComponent(jobId) + "/finish");
+    askNotificationOnce();
+    refreshJobs();
+  }
+
+  function askNotificationOnce() {
+    if (notifyAsked || !("Notification" in window) || Notification.permission !== "default") return;
+    notifyAsked = true;
+    try { Notification.requestPermission(); } catch (err) {}
+  }
+
+  function notifyDone(filename) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    try { new Notification(filename + " อ่านเสร็จแล้ว"); } catch (err) {}
+  }
+
+  // ---- my jobs panel ----
+
+  function stateLabel(job) {
+    if (job.state === "queued" && job.position) return "รอคิว (ลำดับ " + job.position + ")";
+    return STATE_LABELS[job.state] || job.state;
+  }
+
+  function jobDetail(job) {
+    var parts = [];
+    if (job.state === "uploading") parts.push(JobsClient.formatBytes(job.size));
+    if (job.pages) parts.push("หน้า " + (job.done_pages || 0) + " / " + job.pages);
+    if (job.state === "queued" || job.state === "running") parts.push(JobsClient.formatEta(job.eta_seconds));
+    if (job.failed_pages && job.failed_pages.length) parts.push("หน้าที่ล้มเหลว " + job.failed_pages.length);
+    return parts.join(" · ");
+  }
+
+  function createJobRow(id) {
+    var name = h("span", { class: "job-name" });
+    var state = h("span", { class: "job-state" });
+    var fill = h("div", { class: "job-fill" });
+    var meta = h("p", { class: "job-meta" });
+    var viewBtn = h("button", { class: "btn", type: "button", text: "ดูผล" });
+    var txtLink = h("a", {
+      class: "btn btn-link",
+      href: "/api/jobs/" + encodeURIComponent(id) + "/text",
+      download: "",
+      text: "ดาวน์โหลด .txt"
+    });
+    var copyBtn = h("button", { class: "btn", type: "button", text: "คัดลอกลิงก์" });
+    var delBtn = h("button", { class: "btn", type: "button", text: "ลบ" });
+    var row = h("li", { class: "job-row" },
+      h("div", { class: "job-top" }, name, state),
+      h("div", { class: "job-bar" }, fill),
+      meta,
+      h("div", { class: "job-actions" }, viewBtn, txtLink, copyBtn, delBtn));
+
+    viewBtn.addEventListener("click", function () { viewJob(id); });
+    copyBtn.addEventListener("click", function () { copyJobLink(id, copyBtn); });
+    delBtn.addEventListener("click", function () { deleteJob(id); });
+    return { id: id, row: row, name: name, state: state, fill: fill, meta: meta, viewBtn: viewBtn, txtLink: txtLink, delBtn: delBtn };
+  }
+
+  function updateJobRow(rec, job) {
+    var done = job.done_pages || 0;
+    var hasResult = done > 0;
+    var fraction = job.state === "done" ? 1 : job.pages ? done / job.pages : 0;
+    rec.name.textContent = job.filename;
+    rec.state.textContent = stateLabel(job);
+    rec.state.className = "job-state" +
+      (job.state === "done" ? " is-done" : job.state === "failed" ? " is-failed" : "");
+    rec.fill.style.width = Math.round(fraction * 100) + "%";
+    rec.meta.textContent = jobDetail(job);
+    rec.viewBtn.disabled = !hasResult;
+    rec.txtLink.hidden = !hasResult;
+    rec.delBtn.hidden = !job.mine;  // only the owner sees ลบ; a shared job is viewed, not removed
+  }
+
+  function renderJobs(jobs) {
+    var seen = new Set();
+    jobs.forEach(function (job) {
+      seen.add(job.id);
+      var rec = jobRows.get(job.id);
+      if (!rec) {
+        rec = createJobRow(job.id);
+        jobRows.set(job.id, rec);
+        jobsList.appendChild(rec.row);
+      }
+      updateJobRow(rec, job);
+    });
+    jobRows.forEach(function (rec, id) {
+      if (!seen.has(id) && id !== sharedJobId) {
+        rec.row.remove();
+        jobRows.delete(id);
+      }
+    });
+    jobsCount.textContent = jobRows.size + " งาน";
+    jobsCard.hidden = jobRows.size === 0;
+  }
+
+  function notifyCompletions(jobs, nextStates) {
+    if (knownStates) {
+      jobs.forEach(function (job) {
+        var before = knownStates.get(job.id);
+        if (job.state === "done" && before !== undefined && before !== "done") notifyDone(job.filename);
+      });
+    }
+    knownStates = nextStates;
+  }
+
+  // Resolves to true while any job is still moving (so the next poll comes sooner).
+  async function loadJobs() {
+    var jobs = await api("GET", "/api/jobs");
+    if (sharedJobId && !jobs.some(function (job) { return job.id === sharedJobId; })) {
+      try {
+        jobs = jobs.concat([await api("GET", "/api/jobs/" + encodeURIComponent(sharedJobId))]);
+      } catch (err) {
+        if (err.message === SESSION_ERROR) throw err;
+        sharedJobId = null;
+      }
+    }
+    var nextStates = new Map();
+    jobs.forEach(function (job) { nextStates.set(job.id, job.state); });
+    notifyCompletions(jobs, nextStates);
+    renderJobs(jobs);
+    return jobs.some(function (job) { return ACTIVE_STATES.indexOf(job.state) !== -1; });
+  }
+
+  function scheduleJobs(ms) {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(refreshJobs, ms);
+  }
+
+  // Polls never overlap: the next poll is scheduled only after the current one settles.
+  function refreshJobs() {
+    if (jobsInFlight) {
+      jobsAgain = true;
+      return jobsInFlight;
+    }
+    clearTimeout(pollTimer);
+    jobsInFlight = loadJobs().then(function (active) {
+      return active ? POLL_ACTIVE_MS : POLL_IDLE_MS;
+    }, function () {
+      return POLL_IDLE_MS;
+    }).then(function (ms) {
+      jobsInFlight = null;
+      if (jobsAgain) {
+        jobsAgain = false;
+        refreshJobs();
+      } else {
+        scheduleJobs(ms);
+      }
+    });
+    return jobsInFlight;
+  }
+
+  async function viewJob(id) {
+    try {
+      renderResult(await api("GET", "/api/jobs/" + encodeURIComponent(id) + "/result"));
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  function copyJobLink(id, btn) {
+    navigator.clipboard.writeText(location.origin + "/?job=" + encodeURIComponent(id)).then(function () {
+      flash(btn, "คัดลอกแล้ว", "คัดลอกลิงก์");
+    }, function () {});
+  }
+
+  async function deleteJob(id) {
+    if (!window.confirm("ลบงานนี้? ผลลัพธ์จะถูกลบด้วย")) return;
+    try {
+      await api("DELETE", "/api/jobs/" + encodeURIComponent(id));
+    } catch (err) {
+      showError(err.message);
+      return;
+    }
+    if (sharedJobId === id) sharedJobId = null;
+    refreshJobs();
+  }
+
+  // ---- init ----
+
+  modeSelect.value = readMode();
+  modeSelect.addEventListener("change", function () {
+    saveMode(modeSelect.value);
+    ramWarning.hidden = true;
+  });
+
+  logoutBtn.addEventListener("click", function () {
+    fetch("/api/logout", { method: "POST", credentials: "same-origin" }).then(function () {}, function () {})
+      .then(function () { location.href = "/login.html"; });
+  });
+
+  var sharedParam = new URLSearchParams(location.search).get("job");
+  if (sharedParam) {
+    sharedJobId = sharedParam;
+    api("GET", "/api/jobs/" + encodeURIComponent(sharedParam)).then(function (job) {
+      refreshJobs();
+      if (job.state === "done" && job.done_pages > 0) viewJob(job.id);
+    }, function (err) {
+      sharedJobId = null;
+      showError(err.message);
+      refreshJobs();
+    });
+  } else {
+    refreshJobs();
+  }
+})();
+</script>
+</body>
+</html>

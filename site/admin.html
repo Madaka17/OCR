@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ผู้ดูแลระบบ · Thai OCR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+  /* Indigo dashboard: dark only. Same tokens as index.html. */
+  :root {
+    color-scheme: dark;
+    --bg: #0A0C13;
+    --panel: #0F121B;
+    --card: #141824;
+    --field: #191E2C;
+    --field-hover: #1E2435;
+    --border: #252B3C;
+    --hover-border: #343B52;
+    --text: #E8EAF3;
+    --text-2: #C3C7D6;
+    --muted: #8F96AD;
+    --accent: #8F8DFF;
+    --accent-strong: #5F5CE6;
+    --accent-soft: rgba(110,107,248,.14);
+    --accent-text: #FFFFFF;
+    --green: #4ade80;
+    --amber: #f59e0b;
+    --red: #f87171;
+    --green-fill: rgba(74, 222, 128, 0.18);
+    --amber-fill: rgba(245, 158, 11, 0.2);
+    --red-fill: rgba(248, 113, 113, 0.2);
+    --match-fill: rgba(250, 204, 21, 0.28);
+    --match-strong: rgba(245, 158, 11, 0.6);
+    --radius: 14px;
+    --radius-lg: 20px;
+    --chip-radius: 999px;
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+    --nav-h: 56px;
+    --font:"IBM Plex Sans Thai","Leelawadee UI","Segoe UI",Tahoma,sans-serif;
+    --mono: ui-monospace, Consolas, "Cascadia Mono", monospace;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px 16px; margin-bottom: 16px;
+  }
+  h1 { font-size: 20px; font-weight: 700; margin: 0; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  a { color: var(--accent); }
+  .status { color: var(--muted); font-size: 13px; }
+  section {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px; margin-bottom: 16px;
+  }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .tile {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+  .tile .label { color: var(--muted); font-size: 13px; }
+  .tile .value { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: start; padding: 10px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  td.name { white-space: normal; min-width: 140px; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .pill {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .pill.done { background: var(--green-fill); color: var(--green); }
+  .pill.failed { background: var(--red-fill); color: var(--red); }
+  .row-label { color: var(--muted); font-size: 13px; margin: 14px 0 4px; }
+  .bars { display: flex; align-items: flex-end; gap: 3px; height: 72px; }
+  .bars > div { flex: 1; min-height: 2px; background: var(--accent-strong); border-radius: 3px 3px 0 0; }
+  .axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .btn {
+    font: inherit; font-size: 13px; padding: 5px 12px; border-radius: var(--chip-radius);
+    border: 1px solid var(--red); background: transparent; color: var(--red); cursor: pointer;
+  }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .empty { color: var(--muted); margin: 8px 0 0; }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>ผู้ดูแลระบบ</h1>
+    <div><span class="status" id="status">กำลังโหลด…</span> · <a href="/">กลับหน้าหลัก</a></div>
+  </header>
+
+  <section>
+    <h2>เครื่อง</h2>
+    <div class="tiles">
+      <div class="tile"><div class="label">CPU</div><div class="value" id="cpu">–</div></div>
+      <div class="tile"><div class="label">RAM ที่ใช้</div><div class="value" id="ram">–</div></div>
+      <div class="tile"><div class="label">ดิสก์ว่าง</div><div class="value" id="disk">–</div></div>
+      <div class="tile"><div class="label">ข้อมูลงาน</div><div class="value" id="data">–</div></div>
+      <div class="tile"><div class="label">Worker</div><div class="value" id="workers">–</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>คิวงาน</h2>
+    <div class="wrap">
+      <table>
+        <thead>
+          <tr><th>ไฟล์</th><th>หน้า</th><th>%</th><th>สถานะ</th><th>ETA</th><th>ลำดับ</th><th></th></tr>
+        </thead>
+        <tbody id="jobs"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="jobs-empty" hidden>ไม่มีงานในระบบ</p>
+  </section>
+
+  <section>
+    <h2>สถิติ</h2>
+    <div class="tiles">
+      <div class="tile"><div class="label">เฉลี่ยต่อหน้า (7 วัน)</div><div class="value" id="avg">–</div></div>
+      <div class="tile"><div class="label">หน้าที่ประมวลผล (7 วัน)</div><div class="value" id="pages7">–</div></div>
+      <div class="tile"><div class="label">หน้าที่ล้มเหลว (7 วัน)</div><div class="value" id="failed7">–</div></div>
+    </div>
+    <div class="row-label">หน้าต่อชั่วโมง (24 ชั่วโมงที่ผ่านมา)</div>
+    <div class="bars" id="bars-hours"></div>
+    <div class="axis"><span>24 ชม. ที่แล้ว</span><span>ตอนนี้</span></div>
+    <div class="row-label">งานที่สร้างต่อวัน (7 วัน)</div>
+    <div class="bars" id="bars-days"></div>
+    <div class="axis"><span>6 วันที่แล้ว</span><span>วันนี้</span></div>
+  </section>
+
+  <section>
+    <h2>ข้อผิดพลาดล่าสุด</h2>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>เวลา</th><th>ไฟล์</th><th>หน้า</th><th>ข้อความ</th></tr></thead>
+        <tbody id="errors"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="errors-empty" hidden>ยังไม่มีข้อผิดพลาด</p>
+  </section>
+</main>
+<script>
+(function () {
+  'use strict';
+  var REFRESH_MS = 5000;
+  var LOGIN_URL = '/login.html?admin=1';
+  var STATUS_TEXT = {
+    uploading: 'กำลังอัปโหลด', queued: 'รอคิว', running: 'กำลังประมวลผล',
+    done: 'เสร็จแล้ว', failed: 'ล้มเหลว', cancelled: 'ยกเลิกแล้ว'
+  };
+  var ACTIVE = { queued: true, running: true };
+
+  function $(id) { return document.getElementById(id); }
+
+  // Everything is written with textContent: file names and messages come from users.
+  function el(tag, text, cls) {
+    var node = document.createElement(tag);
+    if (text != null) node.textContent = String(text);
+    if (cls) node.className = cls;
+    return node;
+  }
+
+  function fmtNum(n, digits) {
+    return Number(n).toLocaleString('th-TH', { maximumFractionDigits: digits || 0 });
+  }
+
+  function fmtEta(seconds) {
+    if (seconds == null) return '–';
+    if (seconds < 60) return '~' + Math.max(1, Math.round(seconds)) + ' วินาที';
+    if (seconds < 3600) return '~' + Math.round(seconds / 60) + ' นาที';
+    return '~' + fmtNum(seconds / 3600, 1) + ' ชม.';
+  }
+
+  function fmtTime(ts) {
+    return new Date(ts * 1000).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'medium' });
+  }
+
+  function setStatus(text) { $('status').textContent = text; }
+
+  function bars(container, values) {
+    container.textContent = '';
+    var max = Math.max.apply(null, values.concat([1]));
+    values.forEach(function (v) {
+      var bar = el('div');
+      bar.style.height = Math.max(2, Math.round(v / max * 72)) + 'px';
+      if (!v) bar.style.opacity = '0.25';
+      bar.title = fmtNum(v);
+      container.appendChild(bar);
+    });
+  }
+
+  function renderJobs(jobs) {
+    var body = $('jobs');
+    body.textContent = '';
+    $('jobs-empty').hidden = jobs.length > 0;
+    jobs.forEach(function (job) {
+      var active = ACTIVE[job.state] === true;
+      var pct = job.pages ? Math.round(job.done_pages / job.pages * 100) : 0;
+      var tr = el('tr');
+      tr.appendChild(el('td', job.filename, 'name'));
+      tr.appendChild(el('td', fmtNum(job.done_pages) + ' / ' + fmtNum(job.pages), 'num'));
+      tr.appendChild(el('td', pct + '%', 'num'));
+
+      var statusCell = el('td');
+      var pillClass = job.state === 'done' ? 'pill done' : job.state === 'failed' ? 'pill failed' : 'pill';
+      statusCell.appendChild(el('span', STATUS_TEXT[job.state] || job.state, pillClass));
+      tr.appendChild(statusCell);
+
+      tr.appendChild(el('td', active ? fmtEta(job.eta_seconds) : '–', 'num'));
+      tr.appendChild(el('td', active ? fmtNum(job.position + 1) : '–', 'num'));
+
+      var actionCell = el('td');
+      if (active) {
+        var button = el('button', 'ยกเลิก', 'btn');
+        button.type = 'button';
+        button.addEventListener('click', function () { cancelJob(job.id, job.filename, button); });
+        actionCell.appendChild(button);
+      }
+      tr.appendChild(actionCell);
+      body.appendChild(tr);
+    });
+  }
+
+  function renderErrors(list) {
+    var body = $('errors');
+    body.textContent = '';
+    $('errors-empty').hidden = list.length > 0;
+    list.forEach(function (e) {
+      var tr = el('tr');
+      tr.appendChild(el('td', fmtTime(e.ts)));
+      tr.appendChild(el('td', e.file, 'name'));
+      tr.appendChild(el('td', e.page, 'num'));
+      tr.appendChild(el('td', e.message, 'name'));
+      body.appendChild(tr);
+    });
+  }
+
+  function render(d) {
+    var r = d.resources;
+    $('cpu').textContent = fmtNum(r.cpu_percent) + '%';
+    $('ram').textContent = fmtNum(r.ram_used_gb, 1) + ' / ' + fmtNum(r.ram_total_gb, 1) + ' GB';
+    $('disk').textContent = fmtNum(r.disk_free_gb, 1) + ' GB';
+    $('data').textContent = fmtNum(r.data_dir_gb, 2) + ' GB';
+    $('workers').textContent = d.workers.alive
+      ? 'ทำงานปกติ (' + d.workers.count + ')'
+      : 'มีงานหยุดทำงาน';
+
+    var s = d.stats;
+    $('avg').textContent = s.avg_seconds_per_page == null
+      ? '–'
+      : fmtNum(s.avg_seconds_per_page, 1) + ' วินาที';
+    $('pages7').textContent = fmtNum(s.pages_7d);
+    $('failed7').textContent = fmtNum(s.failed_pages_7d);
+    bars($('bars-hours'), s.pages_per_hour);
+    bars($('bars-days'), s.jobs_per_day);
+
+    renderJobs(d.jobs);
+    renderErrors(d.errors);
+  }
+
+  function redirectToLogin() {
+    window.location.href = LOGIN_URL;
+  }
+
+  function refresh() {
+    return fetch('/api/admin/overview', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (res) {
+        if (res.status === 401 || res.status === 403) {
+          redirectToLogin();
+          throw new Error('auth');
+        }
+        if (!res.ok) throw new Error('http ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        render(data);
+        setStatus('อัปเดตล่าสุด ' + new Date().toLocaleTimeString('th-TH'));
+      })
+      .catch(function (err) {
+        if (err.message !== 'auth') setStatus('เชื่อมต่อไม่ได้ จะลองใหม่อัตโนมัติ');
+      });
+  }
+
+  function cancelJob(id, name, button) {
+    if (!window.confirm('ยกเลิกและลบงาน "' + name + '" ? ผลลัพธ์จะหายไป')) return;
+    button.disabled = true;
+    fetch('/api/admin/jobs/' + encodeURIComponent(id), {
+      method: 'DELETE',
+      credentials: 'same-origin'
+    }).then(function (res) {
+      if (res.status === 401 || res.status === 403) return redirectToLogin();
+      if (!res.ok) throw new Error('http ' + res.status);
+      return refresh();
+    }).catch(function () {
+      button.disabled = false;
+      setStatus('ยกเลิกไม่สำเร็จ ลองใหม่อีกครั้ง');
+    });
+  }
+
+  refresh();
+  window.setInterval(refresh, REFRESH_MS);
+})();
+</script>
+</body>
+</html>

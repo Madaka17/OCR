@@ -1,0 +1,233 @@
+[
+ {
+  "in": "",
+  "canonical": "ฐิี",
+  "fix_scripts": "ฐิี",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "ก",
+  "canonical": "กั่",
+  "fix_scripts": "กั่",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "",
+  "canonical": "ฺูญ",
+  "fix_scripts": "ฺูญ",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": " ดี",
+  "canonical": "็่ ดี",
+  "fix_scripts": "็่ ดี",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "​ไทย‌",
+  "canonical": "ไทย",
+  "fix_scripts": "ไทย",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "ไทย­­แลนด์",
+  "canonical": "ไทยแลนด์",
+  "fix_scripts": "ไทยแลนด์",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "﻿สวัสดี",
+  "canonical": "สวัสดี",
+  "fix_scripts": "สวัสดี",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "ค่า น้ำ",
+  "canonical": "ค่า น้ำ",
+  "fix_scripts": "ค่า น้ำ",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "นํ้า",
+  "canonical": "น้ำ",
+  "fix_scripts": "น้ำ",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "น้ํา",
+  "canonical": "น้ำ",
+  "fix_scripts": "น้ำ",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "เเ",
+  "canonical": "แ",
+  "fix_scripts": "แ",
+  "invalid_share": 1.0,
+  "enum": null
+ },
+ {
+  "in": "ำำ",
+  "canonical": "ำ",
+  "fix_scripts": "ำ",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "น้้ำ",
+  "canonical": "น้ำ",
+  "fix_scripts": "น้ำ",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "ก่ั",
+  "canonical": "กั่",
+  "fix_scripts": "กั่",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "กํ่า",
+  "canonical": "ก่ำ",
+  "fix_scripts": "ก่ำ",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "ปิ่ั",
+  "canonical": "ปิั่",
+  "fix_scripts": "ปิั่",
+  "invalid_share": 0.25,
+  "enum": null
+ },
+ {
+  "in": "W.ศ.",
+  "canonical": "W.ศ.",
+  "fix_scripts": "พ.ศ.",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "wฤษภาคม",
+  "canonical": "wฤษภาคม",
+  "fix_scripts": "พฤษภาคม",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "๗o.๘๒",
+  "canonical": "๗o.๘๒",
+  "fix_scripts": "๗๐.๘๒",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "(๑๒) ข้อ",
+  "canonical": "(๑๒) ข้อ",
+  "fix_scripts": "(๑๒) ข้อ",
+  "invalid_share": 0.0,
+  "enum": 12
+ },
+ {
+  "in": "3. item",
+  "canonical": "3. item",
+  "fix_scripts": "3. item",
+  "invalid_share": 0.0,
+  "enum": 3
+ },
+ {
+  "in": "บรรทัด๑\r\nบรรทัด๒",
+  "canonical": "บรรทัด๑\nบรรทัด๒",
+  "fix_scripts": "บรรทัด๑\nบรรทัด๒",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "a\tb\tc",
+  "canonical": "a b c",
+  "fix_scripts": "a b c",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "",
+  "canonical": "",
+  "fix_scripts": "",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "ูี้ซ์ ริ ร้ร้ ไ้",
+  "canonical": "ูี้ซ์ ริ ร้ร้ ไ้",
+  "fix_scripts": "ูี้ซ์ ริ ร้ร้ ไ้",
+  "invalid_share": 0.38461538461538464,
+  "enum": null
+ },
+ {
+  "in": "  ช่องว่าง   หลายช่อง  ",
+  "canonical": "ช่องว่าง หลายช่อง",
+  "fix_scripts": "ช่องว่าง หลายช่อง",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "123 ๑๒๓",
+  "canonical": "123 ๑๒๓",
+  "fix_scripts": "123 ๑๒๓",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "กรุงเทพฯ",
+  "canonical": "กรุงเทพฯ",
+  "fix_scripts": "กรุงเทพฯ",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "hello world",
+  "canonical": "hello world",
+  "fix_scripts": "hello world",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "\r\n\r\nบรรทัดแรก\n\nบรรทัดสุดท้าย\r\n",
+  "canonical": "บรรทัดแรก\n\nบรรทัดสุดท้าย",
+  "fix_scripts": "บรรทัดแรก\n\nบรรทัดสุดท้าย",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "ที่ดิน‍ที่ดี",
+  "canonical": "ที่ดินที่ดี",
+  "fix_scripts": "ที่ดินที่ดี",
+  "invalid_share": 0.0,
+  "enum": null
+ },
+ {
+  "in": "ญุ",
+  "canonical": "ญญุ",
+  "fix_scripts": "ญญุ",
+  "invalid_share": 0.5,
+  "enum": null
+ },
+ {
+  "in": "ฐานข้อมูล",
+  "canonical": "ฐานข้อมูล",
+  "fix_scripts": "ฐานข้อมูล",
+  "invalid_share": 0.0,
+  "enum": null
+ }
+]

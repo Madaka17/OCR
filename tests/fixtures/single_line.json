@@ -1,0 +1,47 @@
+{
+ "shape": [
+  60,
+  400
+ ],
+ "detect": [],
+ "split_counts": [],
+ "page": {
+  "boxes": [],
+  "texts": [],
+  "confs": [],
+  "rows": [],
+  "angle": 0.0,
+  "fragments": []
+ },
+ "read": {
+  "text": "ประเทศไทย",
+  "lines": [
+   {
+    "text": "ประเทศไทย",
+    "confidence": 0.9351,
+    "row": 0,
+    "box": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      399.0,
+      0.0
+     ],
+     [
+      399.0,
+      59.0
+     ],
+     [
+      0.0,
+      59.0
+     ]
+    ]
+   }
+  ],
+  "dropped": [],
+  "rotation": 0,
+  "text_angle": 0.0
+ }
+}
