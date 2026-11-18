@@ -95,7 +95,7 @@ web/ + web_app.py        เวอร์ชันเดี่ยวแบบเ�
 tests/                   ทดสอบ Node
 tests_py/                ทดสอบ pytest
 tools/                   สคริปต์ build และติดตั้ง
-docs/                    แผนงาน
+docs/images/             ภาพหน้าจอสำหรับ README
 ```
 
 ## สัญญาอนุญาต

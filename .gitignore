@@ -16,3 +16,6 @@ data/
 OpenThai2.0-OCR-Text/.cache/
 OpenThai2.0-OCR-Text/pytorch/
 *.zip
+
+# planning notes (kept local)
+docs/superpowers/
