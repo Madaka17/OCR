@@ -1,14 +1,3 @@
----
-title: Thai OCR
-emoji: 📄
-colorFrom: yellow
-colorTo: gray
-sdk: docker
-app_port: 7860
-pinned: false
-license: apache-2.0
----
-
 # Thai OCR
 
 อ่านข้อความภาษาไทยและอังกฤษจากรูปภาพและ PDF ทำงานบน CPU ไม่ต้องใช้ GPU
@@ -42,13 +31,12 @@ python -m server passwords --user <รหัสผู้ใช้> --admin <ร�
 python -m server
 ```
 
-เปิด http://127.0.0.1:7860
+เปิดเบราว์เซอร์ตามที่อยู่ที่ server แสดงตอนเริ่มทำงาน
 
 ค่าที่ตั้งได้ด้วย environment variable:
 
 | ตัวแปร | ค่าเริ่มต้น | ความหมาย |
 |---|---|---|
-| `PORT` | `7860` | พอร์ตที่ server ฟัง |
 | `HOST` | `0.0.0.0` | ที่อยู่ที่รับการเชื่อมต่อ |
 | `OCR_DATA` | `data/` | โฟลเดอร์เก็บข้อมูลงานและการตั้งค่า |
 | `OCR_WORKERS` | `2` | จำนวน worker ที่อ่านงานพร้อมกัน |
@@ -65,7 +53,7 @@ python -m server
 python web_app.py
 ```
 
-เปิด http://127.0.0.1:8000 หน้าเว็บอยู่ที่ `web/index.html` ไฟล์นี้ใช้กับ `Dockerfile`
+หน้าเว็บอยู่ที่ `web/index.html` ไฟล์นี้ใช้กับ `Dockerfile`
 
 ## ทดสอบ
 
