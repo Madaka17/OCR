@@ -205,6 +205,20 @@ class JobStore:
             return None
         return self._read_json_file(self._job_dir(job_id) / "pages" / f"{number}.json")
 
+    def read_summary(self, job_id: str) -> dict | None:
+        if not _valid_id(job_id):
+            return None
+        return self._read_json_file(self._job_dir(job_id) / "summary.json")
+
+    def write_summary(self, job_id: str, data: dict) -> bool:
+        """Atomically write summary.json. Writes nothing when the job's meta.json is gone."""
+        with self._lock:
+            if not _valid_id(job_id) or self._read_meta(job_id) is None:
+                return False
+            payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            _atomic_write(self._job_dir(job_id) / "summary.json", payload)
+            return True
+
     def _page_ok(self, path: Path) -> bool:
         """A page file counts only if it parses. A file that does not parse is deleted so
         the page is produced again; a file that merely cannot be read is left alone."""

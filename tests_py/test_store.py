@@ -300,3 +300,20 @@ def test_assemble_twice_returns_existing_source(store, tmp_path, monkeypatch):
     again = store.assemble(job_id)
 
     assert again.read_bytes() == b"abcd"
+
+
+# ----- summary.json (summary worker) -----------------------------------------
+
+def test_summary_round_trip(store):
+    job = store.create("u1", "doc.pdf", 10, now=0)
+    assert store.read_summary(job["id"]) is None
+    assert store.write_summary(job["id"], {"state": "pending", "title": "สรุป"}) is True
+    assert store.read_summary(job["id"]) == {"state": "pending", "title": "สรุป"}
+
+
+def test_write_summary_skips_deleted_job(store, tmp_path):
+    job = store.create("u1", "doc.pdf", 10, now=0)
+    store.delete(job["id"])
+
+    assert store.write_summary(job["id"], {"state": "pending"}) is False
+    assert not (tmp_path / "jobs" / job["id"]).exists()
