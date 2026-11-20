@@ -1231,8 +1231,12 @@
 
     // Failed pages have no image or size (server error pages): show the text part only.
     var hasSize = !!(page.width && page.height);
+    // Known size lets the browser reserve the aspect ratio before the image loads, so sections
+    // above a jump target do not grow mid-scroll; height:auto in CSS keeps it responsive.
+    var imgAttrs = { src: page.image, alt: "หน้า " + page.number, loading: "lazy", decoding: "async" };
+    if (hasSize) { imgAttrs.width = page.width; imgAttrs.height = page.height; }
     var figure = h("div", { class: "figure" },
-      page.image ? h("img", { src: page.image, alt: "หน้า " + page.number, loading: "lazy", decoding: "async" }) : null,
+      page.image ? h("img", imgAttrs) : null,
       hasSize ? svg : null);
 
     view.section = h("section", { class: "card page-card" },
@@ -2160,12 +2164,16 @@
   var summaryTimer = null;     // the one pending poll, if any
   var summaryReq = 0;          // bumped on every load and hide, so a late response is dropped
   var summaryCollapsed = false;
+  var summaryBusy = false;     // last state the server reported for the card was pending or running
+  var summaryFailing = false;  // a background poll failed; the error is shown once, not per retry
 
   // Removes the card and any pending poll. Called whenever a result is rendered or cleared.
   function hideSummary() {
     clearTimeout(summaryTimer);
     summaryTimer = null;
     summaryReq++;
+    summaryBusy = false;
+    summaryFailing = false;
     currentJobId = null;
     summaryCard.replaceChildren();
     summaryCard.hidden = true;
@@ -2180,17 +2188,29 @@
     try {
       data = await api("GET", "/api/jobs/" + encodeURIComponent(id) + "/summary");
     } catch (err) {
-      if (req === summaryReq) showError(err.message);
+      if (req !== summaryReq) return;
+      if (summaryBusy) {
+        // Server restart or network blip while the summary is still running: keep polling
+        // so the card does not sit on its last state until reload. Report the first failure only.
+        if (!summaryFailing) showError(err.message);
+        summaryFailing = true;
+        summaryTimer = setTimeout(function () { loadSummary(id); }, SUMMARY_POLL_MS);
+        return;
+      }
+      showError(err.message);
       return;
     }
     if (req !== summaryReq) return;  // another result was viewed while this request was in flight
+    summaryFailing = false;
     if (!data.enabled) {
+      summaryBusy = false;
       summaryCard.replaceChildren();
       summaryCard.hidden = true;
       return;
     }
     renderSummaryCard(id, data);
-    if (SummaryView.isBusy(data.state)) {
+    summaryBusy = SummaryView.isBusy(data.state);
+    if (summaryBusy) {
       summaryTimer = setTimeout(function () { loadSummary(id); }, SUMMARY_POLL_MS);
     }
   }

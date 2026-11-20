@@ -14,6 +14,7 @@ UNAVAILABLE_CAP_SECONDS = 300
 ATTEMPT_LIMIT = 3
 RETRY_STEP_SECONDS = 30
 ERROR_CHARS = 300
+STOP_TIMEOUT_SECONDS = 5
 ACTIVE = ("pending", "running")
 STATES = ("pending", "running", "done", "failed", "short")
 DEFAULTS = {"attempts": 0, "waits": 0, "next_try_at": 0, "error": None, "progress": None, "result": None}
@@ -48,10 +49,15 @@ class SummaryWorker:
         self._thread.start()
 
     def stop(self) -> None:
+        # Bounded: an in-flight LLM call can take minutes. The thread is a daemon, so
+        # giving up on it here never keeps shutdown waiting on the model.
         self._stop.set()
         if self._thread is not None:
-            self._thread.join()
-            self._thread = None
+            self._thread.join(STOP_TIMEOUT_SECONDS)
+            if self._thread.is_alive():
+                self._report("still busy at shutdown, abandoning", RuntimeError("LLM call in flight"))
+            else:
+                self._thread = None
 
     def _report(self, what: str, error: BaseException) -> None:
         print(f"[summary-worker] {what}: {error!r}", file=sys.stderr, flush=True)

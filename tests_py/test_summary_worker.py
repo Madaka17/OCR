@@ -251,3 +251,30 @@ def test_persistent_final_write_failure_fails_after_three(store, make_worker):
     assert record["state"] == "failed"
     assert record["attempts"] == 3
     assert "disk full" in record["error"]
+
+
+def test_stop_returns_within_bound_while_llm_call_blocks(store, make_worker):
+    # A stuck LLM call (up to 600 s in production) must not hold up shutdown.
+    entered = threading.Event()
+    release = threading.Event()
+
+    def block():
+        entered.set()
+        release.wait(60)
+
+    make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    worker = make_worker(llm=FakeLLM(on_call=block))
+    worker.start()
+    try:
+        assert entered.wait(10), "worker never reached the LLM call"
+
+        stopper = threading.Thread(target=worker.stop, daemon=True)
+        began = time.monotonic()
+        stopper.start()
+        stopper.join(15)
+        elapsed = time.monotonic() - began
+
+        assert not stopper.is_alive(), "stop() blocked on the in-flight LLM call"
+        assert elapsed < 6.5
+    finally:
+        release.set()

@@ -85,9 +85,9 @@ def serve() -> int:
         print("\nShutting down.", flush=True)
     finally:
         httpd.server_close()
+        scheduler.stop()
         if summaries is not None:
             summaries.stop()
-        scheduler.stop()
     return 0
 
 
