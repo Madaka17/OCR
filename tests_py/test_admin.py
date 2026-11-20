@@ -1,4 +1,4 @@
-from test_app import create_job, env, logged_in, pdf_bytes  # noqa: F401 - env is a fixture
+from test_app import create_job, env, env_llm, logged_in, pdf_bytes  # noqa: F401 - fixtures
 
 from server.stats import EventLog
 
@@ -21,7 +21,7 @@ def test_admin_overview_403_for_user_200_for_admin(env):
     r = admin.request("GET", "/api/admin/overview")
     assert r.status == 200
     body = r.json()
-    assert set(body) == {"jobs", "stats", "errors", "resources", "workers"}
+    assert set(body) == {"jobs", "stats", "errors", "resources", "workers", "llm"}
     assert set(body["workers"]) == {"count", "alive"}
     assert body["workers"]["count"] == 2
     assert body["workers"]["alive"] is True
@@ -84,3 +84,15 @@ def test_admin_errors_resolve_filename_or_fall_back_to_job_id(env):
     assert by_message["ocr failed"]["page"] == 2
     assert by_message["old failure"]["file"] == "gone-job-id"
     assert errors[0]["message"] == "old failure"  # newest first
+
+
+def test_overview_includes_llm_status(env_llm):
+    admin = logged_in(env_llm, "admin-pw")
+    body = admin.request("GET", "/api/admin/overview").json()
+    assert body["llm"]["enabled"] is True
+    assert body["llm"]["model"] == "test-model"
+
+
+def test_overview_llm_disabled(env):
+    admin = logged_in(env, "admin-pw")
+    assert admin.request("GET", "/api/admin/overview").json()["llm"] == {"enabled": False}

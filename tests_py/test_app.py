@@ -16,6 +16,7 @@ from server.auth import Auth
 from server.scheduler import Scheduler
 from server.stats import EventLog
 from server.store import JobStore
+from server.summary_worker import SummaryWorker
 
 
 class FakeEngine:
@@ -86,6 +87,15 @@ class Client:
 
 @pytest.fixture
 def env(tmp_path):
+    yield from serve_env(tmp_path, llm=False)
+
+
+@pytest.fixture
+def env_llm(tmp_path):
+    yield from serve_env(tmp_path, llm=True)
+
+
+def serve_env(tmp_path, llm):
     data = tmp_path / "data"
     site = tmp_path / "site"
     (site / "js").mkdir(parents=True)
@@ -101,7 +111,9 @@ def env(tmp_path):
     sched = Scheduler(store, events, engine_factory=FakeEngine, workers=2)
     sched.start()
     wait_until_alive(sched)
-    httpd = make_server("127.0.0.1", 0, store, sched, auth, events, site_dir=site)
+    # The worker is built but never started: tests drive summary records directly.
+    summaries = SummaryWorker(store, None, "test-model", url="http://llm.test/v1") if llm else None
+    httpd = make_server("127.0.0.1", 0, store, sched, auth, events, site_dir=site, summaries=summaries)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     yield SimpleNamespace(
@@ -745,3 +757,107 @@ def test_health_503_when_no_engine_ever_loads(env, monkeypatch):
         httpd.server_close()
         thread.join()
         sched.stop()
+
+
+# ----- AI summary API ---------------------------------------------------------
+
+SUMMARY_OFF_MSG = "ไม่ได้เปิดใช้การสรุปด้วย AI"
+
+
+def done_job(client, env):
+    data = pdf_bytes(env.tmp)
+    job_id, chunk_size = create_job(client, len(data))
+    upload_all(client, job_id, data, chunk_size)
+    r = client.request("POST", f"/api/jobs/{job_id}/finish")
+    assert r.status == 200, r.body
+    wait_state(client, job_id, "done")
+    return job_id
+
+
+def write_summary(env, job_id, state, **fields):
+    record = {"state": state, "updated_at": 1.0, "attempts": 0, "waits": 0, "next_try_at": 0,
+              "error": None, "progress": None, "model": "test-model", "result": None}
+    record.update(fields)
+    assert env.store.write_summary(job_id, record)
+
+
+def test_summary_state_in_job_list_when_enabled(env_llm):
+    user = logged_in(env_llm)
+    job_id = done_job(user, env_llm)
+    write_summary(env_llm, job_id, "done", result={"title": "t"})
+
+    jobs = user.request("GET", "/api/jobs").json()
+    assert [j["summary_state"] for j in jobs if j["id"] == job_id] == ["done"]
+
+
+def test_summary_state_null_when_enabled_but_no_record(env_llm):
+    user = logged_in(env_llm)
+    job_id = done_job(user, env_llm)
+
+    assert user.request("GET", f"/api/jobs/{job_id}").json()["summary_state"] is None
+    assert user.request("GET", f"/api/jobs/{job_id}/summary").json() == {"enabled": True, "state": None}
+
+
+def test_no_summary_state_when_disabled(env):
+    user = logged_in(env)
+    job_id = done_job(user, env)
+
+    assert "summary_state" not in user.request("GET", f"/api/jobs/{job_id}").json()
+    r = user.request("GET", f"/api/jobs/{job_id}/summary")
+    assert r.status == 200
+    assert r.json() == {"enabled": False}
+
+
+def test_get_summary_visible_to_other_session(env_llm):
+    owner = logged_in(env_llm)
+    job_id = done_job(owner, env_llm)
+    write_summary(env_llm, job_id, "done", result={"title": "t"})
+
+    r = logged_in(env_llm).request("GET", f"/api/jobs/{job_id}/summary")
+    assert r.status == 200
+    body = r.json()
+    assert body["enabled"] is True
+    assert body["state"] == "done"
+    assert body["result"] == {"title": "t"}
+
+
+def test_post_summary_conflict_while_pending(env_llm):
+    user = logged_in(env_llm)
+    job_id = done_job(user, env_llm)
+    write_summary(env_llm, job_id, "pending")
+
+    assert user.request("POST", f"/api/jobs/{job_id}/summary").status == 409
+
+
+def test_post_summary_by_non_owner_allowed(env_llm):
+    owner = logged_in(env_llm)
+    job_id = done_job(owner, env_llm)
+    write_summary(env_llm, job_id, "done", result={"title": "t"})
+
+    r = logged_in(env_llm).request("POST", f"/api/jobs/{job_id}/summary")
+    assert r.status == 202
+    assert r.json()["state"] == "pending"
+
+
+def test_post_summary_disabled_503(env):
+    user = logged_in(env)
+    job_id = done_job(user, env)
+
+    r = user.request("POST", f"/api/jobs/{job_id}/summary")
+    assert r.status == 503
+    assert r.json() == {"error": SUMMARY_OFF_MSG}
+
+
+def test_get_summary_unknown_job_404(env_llm):
+    user = logged_in(env_llm)
+    assert user.request("GET", "/api/jobs/does-not-exist/summary").status == 404
+
+
+def test_post_summary_unknown_job_404(env_llm):
+    user = logged_in(env_llm)
+    assert user.request("POST", "/api/jobs/does-not-exist/summary").status == 404
+
+
+def test_summary_routes_need_login(env_llm):
+    assert env_llm.client.fresh().request("GET", "/api/jobs/x/summary").status == 401
+    assert env_llm.client.fresh().request("POST", "/api/jobs/x/summary").status == 401

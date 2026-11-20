@@ -13,9 +13,11 @@ import sys
 from server import settings
 from server.app import make_server, start_cleanup
 from server.auth import Auth
+from server.llm import LLMClient
 from server.scheduler import Scheduler
 from server.stats import EventLog
 from server.store import JobStore
+from server.summary_worker import SummaryWorker
 
 
 def config_path():
@@ -47,6 +49,16 @@ def ask_password(label: str) -> str | None:
     return first if first and first == second else None
 
 
+def make_summaries(store):
+    """The AI summary worker, or None when OCR_LLM_URL is empty. Built but not started."""
+    if not settings.LLM_URL:
+        print("AI summary: off", flush=True)
+        return None
+    print(f"AI summary: {settings.LLM_MODEL} at {settings.LLM_URL}", flush=True)
+    llm = LLMClient(settings.LLM_URL, settings.LLM_MODEL)
+    return SummaryWorker(store, llm, settings.LLM_MODEL, url=settings.LLM_URL)
+
+
 def serve() -> int:
     auth = Auth(config_path())
     if not auth.ready():
@@ -61,15 +73,20 @@ def serve() -> int:
     scheduler = Scheduler(store, events, engine_factory=load_engine, workers=settings.WORKERS)
     scheduler.start()
     start_cleanup(store, events=events)
-    httpd = make_server(settings.HOST, settings.PORT, store, scheduler, auth, events)
+    summaries = make_summaries(store)
+    httpd = make_server(settings.HOST, settings.PORT, store, scheduler, auth, events, summaries=summaries)
     host, port = httpd.server_address[:2]
     print(f"Listening on http://{host}:{port}", flush=True)
+    if summaries is not None:
+        summaries.start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("\nShutting down.", flush=True)
     finally:
         httpd.server_close()
+        if summaries is not None:
+            summaries.stop()
         scheduler.stop()
     return 0
 
