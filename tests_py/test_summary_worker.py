@@ -200,3 +200,32 @@ def test_thread_start_stop(store, make_worker):
 
     worker.stop()
     assert not any(t.name == "summary-worker" and t.is_alive() for t in threading.enumerate())
+
+
+def test_final_write_failure_repends(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    real_write = store.write_summary
+
+    def fail_on_done(job, data):
+        if data["state"] == "done":
+            raise OSError("disk full")
+        return real_write(job, data)
+
+    store.write_summary = fail_on_done
+    assert make_worker().step(now=10.0) is True
+
+    record = store.read_summary(job_id)
+    assert record["state"] == "pending"
+    assert record["next_try_at"] > 10.0
+
+
+def test_page_read_error_repends(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+
+    def broken_read(job, number):
+        raise OSError("unreadable page")
+
+    store.read_page = broken_read
+    assert make_worker().step(now=10.0) is True
+
+    assert store.read_summary(job_id)["state"] == "pending"

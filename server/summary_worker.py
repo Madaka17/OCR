@@ -56,6 +56,12 @@ class SummaryWorker:
     def _report(self, what: str, error: BaseException) -> None:
         print(f"[summary-worker] {what}: {error!r}", file=sys.stderr, flush=True)
 
+    def _safely_recover(self) -> None:
+        try:
+            self.recover()
+        except Exception as e:
+            self._report("recover failed", e)
+
     def _run(self) -> None:
         # Nothing may escape this loop: a dead worker thread silently stops all summaries.
         while not self._stop.is_set():
@@ -64,6 +70,7 @@ class SummaryWorker:
             except Exception as e:
                 self._report("step failed, will retry", e)
                 worked = False
+                self._safely_recover()
             if not worked:
                 self._stop.wait(self.poll_seconds)
 
@@ -114,13 +121,27 @@ class SummaryWorker:
         meta = self.store.get(job_id)
         if meta is None:
             return
-        pages_total = meta["pages"]
         with self._mu:
             prev = self.store.read_summary(job_id) or {}
-            if self._put(job_id, now, prev, state="running", progress=[0, pages_total]) is None:
+            if self._put(job_id, now, prev, state="running", progress=[0, meta["pages"]]) is None:
                 return
+        try:
+            self._summarize_and_store(job_id, meta, prev, now)
+        except Exception as e:
+            # Any failure after the running write must not leave the record stuck at running.
+            self._report(f"summary of {job_id} interrupted, will retry", e)
+            self._repend(job_id, now, prev, e)
+
+    def _repend(self, job_id: str, now: float, prev: dict, error: BaseException) -> None:
+        try:
+            self._put(job_id, now, prev, state="pending", next_try_at=now + RETRY_STEP_SECONDS,
+                      error=_clip(error), progress=None)
+        except OSError as e:
+            self._report("could not re-pend job, recover() will", e)
+
+    def _summarize_and_store(self, job_id: str, meta: dict, prev: dict, now: float) -> None:
         pages = []
-        for number in range(1, pages_total + 1):
+        for number in range(1, meta["pages"] + 1):
             page = self.store.read_page(job_id, number)
             if page is not None:
                 pages.append(page)
