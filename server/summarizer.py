@@ -134,6 +134,25 @@ def sanitize(raw: dict, page_count: int) -> dict:
     }
 
 
+SUMMARY_CHARS = 1500
+FIELD_CHARS = 200
+
+
+def _compact(raw: dict, page_count: int) -> dict:
+    """Normalize a note and cap its size so a reduce batch stays within budget."""
+    c = sanitize(raw, page_count)
+    c["summary"] = c["summary"][:SUMMARY_CHARS]
+    c["doc_type"] = c["doc_type"][:FIELD_CHARS]
+    c["title"] = c["title"][:FIELD_CHARS]
+    c["parties"] = [p[:FIELD_CHARS] for p in c["parties"]]
+    for key in ("key_points", "dates", "amounts"):
+        c[key] = [
+            {k: (v[:FIELD_CHARS] if isinstance(v, str) else v) for k, v in item.items()}
+            for item in c[key]
+        ]
+    return c
+
+
 def _batches(notes: list[dict]) -> list[list[dict]]:
     out, cur, size = [], [], 0
     for note in notes:
@@ -169,19 +188,21 @@ def summarize(llm, pages: list[dict], filename: str, on_progress=None) -> dict:
             pages=len(pages), filename=filename,
             notes=json.dumps(batch, ensure_ascii=False),
         )
-        out = llm.complete(prompt, REDUCE_SCHEMA, "document_summary", 3000)
+        out = _compact(llm.complete(prompt, REDUCE_SCHEMA, "document_summary", 3000), len(pages))
         out["pages"] = _span(batch)
         return out
 
     with ThreadPoolExecutor(PARALLEL) as pool:
-        notes = []
+        mapped = []
         for i, m in enumerate(pool.map(run_map, chunks), 1):
-            notes.append(m)
+            mapped.append(m)
             if on_progress:
                 on_progress(i, len(chunks))
-        notes = [
-            {"pages": f"{c[0][0]}-{c[-1][0]}", **m} for c, m in zip(chunks, notes)
-        ]
+        notes = []
+        for c, m in zip(chunks, mapped):
+            note = _compact(m, len(pages))
+            note["pages"] = f"{c[0][0]}-{c[-1][0]}"
+            notes.append(note)
 
         reduced = False
         while len(notes) > 1:

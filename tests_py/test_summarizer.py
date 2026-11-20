@@ -1,3 +1,4 @@
+import copy
 import json
 import threading
 
@@ -25,14 +26,17 @@ def _notes_in(prompt):
 
 
 class FakeLLM:
-    def __init__(self, note_chars=10):
+    def __init__(self, note_chars=10, chunk_note=None):
         self.note_chars = note_chars
+        self.chunk_note = chunk_note
         self.calls = []
         self._lock = threading.Lock()
 
     def complete(self, prompt, schema, name, max_tokens):
         with self._lock:
             self.calls.append((name, prompt, max_tokens))
+        if name == "chunk_notes" and self.chunk_note is not None:
+            return copy.deepcopy(self.chunk_note)
         if name == "chunk_notes":
             return {
                 "summary": "m" * self.note_chars,
@@ -140,6 +144,41 @@ def test_prompt_asks_for_document_language():
     assert llm.calls
     for _, prompt, _ in llm.calls:
         assert "ภาษาหลักของเอกสาร" in prompt
+
+
+def test_notes_compacted_before_reduce():
+    big = {
+        "summary": "m" * 20000,
+        "key_points": [],
+        "parties": [],
+        "dates": [],
+        "amounts": [{"label": "x", "value": "1,000", "page": 1} for _ in range(50)],
+    }
+    llm = FakeLLM(chunk_note=big)
+    summarize(llm, [page(1, "x" * 500)], "f.pdf")
+    prompts = llm.prompts("document_summary")
+    assert prompts
+    assert all(len(p) < REDUCE_CHARS + 3000 for p in prompts)
+    for p in prompts:
+        for note in _notes_in(p):
+            assert len(note["summary"]) <= 1500
+            assert len(note["amounts"]) <= 10
+
+
+def test_large_notes_terminate():
+    item = {"label": "L" * 200, "value": "V" * 200, "page": 1}
+    big = {
+        "summary": "s" * 1500,
+        "key_points": [{"text": "k" * 200, "page": 1} for _ in range(8)],
+        "parties": ["p" * 200 for _ in range(10)],
+        "dates": [dict(item) for _ in range(10)],
+        "amounts": [dict(item) for _ in range(10)],
+    }
+    llm = FakeLLM(chunk_note=big)
+    pages = [page(n, "x" * 9000) for n in range(1, 11)]
+    result = summarize(llm, pages, "f.pdf")
+    assert isinstance(result, dict)
+    assert len(llm.prompts("document_summary")) < 20
 
 
 def test_max_tokens_per_stage():
