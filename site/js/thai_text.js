@@ -1,4 +1,4 @@
-// Port of OpenThai2.0-OCR-Text/runtime/thai_norm.py (canonical) and the
+// Port of OpenThai2.0-OCR-Text v2.0.0 runtime/thai_norm.py (canonical) and the
 // fix_scripts / _enum / invalid_share / _is_thai helpers of line_engine.py.
 (function () {
   "use strict";

@@ -2,7 +2,7 @@
 
 อ่านข้อความภาษาไทยและอังกฤษจากรูปภาพและ PDF ทำงานบน CPU ไม่ต้องใช้ GPU
 
-![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg) ![Python](https://img.shields.io/badge/Python-3.14-blue.svg) ![Node test](https://img.shields.io/badge/Node_test-node_--test-green.svg) [![Model](https://img.shields.io/badge/Model-OpenThai2.0--OCR--Text-orange.svg)](https://huggingface.co/iapp/OpenThai2.0-OCR-Text)
+![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg) ![Python](https://img.shields.io/badge/Python-3.14-blue.svg) ![Node test](https://img.shields.io/badge/Node_test-node_--test-green.svg) [![Model](https://img.shields.io/badge/Model-OpenThai2.1--OCR--Text-orange.svg)](https://huggingface.co/iapp/OpenThai2.1-OCR-Text-20261118)
 
 ![หน้าจอ Thai OCR](docs/images/app.jpg)
 
@@ -16,6 +16,8 @@
 - คัดลอกหรือดาวน์โหลดเป็นไฟล์ .txt
 - ระบบ login ด้วยรหัสผู้ใช้และรหัสแอดมิน
 - หน้า admin ดู CPU, RAM, คิวงาน และสถิติ
+
+หมายเหตุ: server/Python ใช้โมเดล OpenThai2.1 (v2.1.4) ส่วนการอ่านในเบราว์เซอร์ยังใช้ตรรกะของ v2.0
 
 ## เริ่มใช้งาน
 
@@ -78,7 +80,7 @@ site/                    หน้าเว็บ index/login/admin
 ├── models/              โมเดล ONNX (สร้างด้วย npm run build)
 └── vendor/              ไลบรารีฝั่งเบราว์เซอร์ (สร้างด้วย npm run build)
 server/                  HTTP server, คิวงาน, auth, สถิติ
-OpenThai2.0-OCR-Text/    โมเดล ONNX และ runtime Python
+OpenThai2.1-OCR-Text/    โมเดล ONNX และ runtime Python
 web/ + web_app.py        เวอร์ชันเดี่ยวแบบเก่า
 tests/                   ทดสอบ Node
 tests_py/                ทดสอบ pytest
@@ -90,4 +92,4 @@ docs/images/             ภาพหน้าจอสำหรับ README
 
 โปรเจกต์นี้ใช้สัญญาอนุญาต [Apache-2.0](LICENSE)
 
-โมเดล [OpenThai2.0-OCR-Text](https://huggingface.co/iapp/OpenThai2.0-OCR-Text) โดย iApp Technology ใช้สัญญาอนุญาต Apache-2.0 พัฒนาต่อจาก PP-OCRv6 tiny ของ PaddlePaddle รายการส่วนประกอบอื่นดูได้ที่ [site/THIRD_PARTY.md](site/THIRD_PARTY.md)
+โมเดล [OpenThai2.1-OCR-Text](https://huggingface.co/iapp/OpenThai2.1-OCR-Text-20261118) โดย iApp Technology ใช้สัญญาอนุญาต Apache-2.0 พัฒนาต่อจาก PP-OCRv6 tiny ของ PaddlePaddle รายการส่วนประกอบอื่นดูได้ที่ [site/THIRD_PARTY.md](site/THIRD_PARTY.md)

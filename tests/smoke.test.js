@@ -30,7 +30,7 @@ test("loadModels returns det/rec sessions that run on zero tensors", async () =>
   assert.equal(chars[chars.length - 1], " ", "space is appended last");
   assert.equal(typeof userConfig, "object");
   assert.equal(userConfig.rec.color, "flatten");
-  assert.ok(MODEL_DIR.endsWith("OpenThai2.0-OCR-Text"));
+  assert.ok(MODEL_DIR.endsWith("OpenThai2.1-OCR-Text"));
 });
 
 test("loadFixture(paragraph) exposes BGR pixels of the declared size", () => {

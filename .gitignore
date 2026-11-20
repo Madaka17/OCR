@@ -13,8 +13,8 @@ data/
 .claude/
 
 # model caches
-OpenThai2.0-OCR-Text/.cache/
-OpenThai2.0-OCR-Text/pytorch/
+OpenThai2.1-OCR-Text/.cache/
+OpenThai2.1-OCR-Text/pytorch/
 *.zip
 
 # planning notes (kept local)

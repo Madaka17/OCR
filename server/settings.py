@@ -3,7 +3,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SITE_DIR = BASE_DIR / "site"
-MODEL_DIR = BASE_DIR / "OpenThai2.0-OCR-Text"
+MODEL_DIR = BASE_DIR / "OpenThai2.1-OCR-Text"
 DATA_DIR = Path(os.environ.get("OCR_DATA", BASE_DIR / "data"))
 
 MAX_JOB_BYTES = 500 * 1024 * 1024

@@ -4,7 +4,7 @@ const path = require("node:path");
 const zlib = require("node:zlib");
 
 const ROOT = path.resolve(__dirname, "..");
-const MODEL_DIR = path.resolve(ROOT, "OpenThai2.0-OCR-Text");
+const MODEL_DIR = path.resolve(ROOT, "OpenThai2.1-OCR-Text");
 const FIXTURE_DIR = path.resolve(__dirname, "fixtures");
 
 // OpenCV.js is either a Promise of the module or the module itself, which

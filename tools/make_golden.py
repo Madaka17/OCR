@@ -18,7 +18,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-MODEL_PARENT = ROOT / "OpenThai2.0-OCR-Text"
+MODEL_PARENT = ROOT / "OpenThai2.1-OCR-Text"
 OUT = ROOT / "tests" / "fixtures"
 FONT = r"C:\Windows\Fonts\tahoma.ttf"
 

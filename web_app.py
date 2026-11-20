@@ -1,4 +1,4 @@
-"""Local web app for the OpenThai 2.0 OCR model.
+"""Local web app for the OpenThai 2.1 OCR model.
 
 Serves a single page where you drop or paste an image or PDF, and shows the
 recognised text next to the page image with a box drawn around every line.
@@ -29,7 +29,7 @@ import cv2
 import numpy as np
 
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_DIR = BASE_DIR / "OpenThai2.0-OCR-Text"
+MODEL_DIR = BASE_DIR / "OpenThai2.1-OCR-Text"
 INDEX_HTML = BASE_DIR / "web" / "index.html"
 MAX_BODY_BYTES = 50 * 1024 * 1024
 MAX_DRAIN_BYTES = 200 * 1024 * 1024
