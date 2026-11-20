@@ -1,5 +1,6 @@
 import importlib
 import json
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -116,8 +117,9 @@ def test_ping_true_and_false(stub):
 
 
 @pytest.fixture
-def reset_settings():
+def reset_settings(monkeypatch):
     yield
+    monkeypatch.undo()
     importlib.reload(settings)
 
 
@@ -131,3 +133,9 @@ def test_settings_defaults(monkeypatch, reset_settings):
     monkeypatch.setenv("OCR_LLM_URL", "")
     importlib.reload(settings)
     assert settings.LLM_URL == ""
+
+
+def test_settings_default_not_leaked_to_later_tests():
+    if "OCR_LLM_URL" in os.environ:
+        pytest.skip("OCR_LLM_URL is set in the real environment")
+    assert settings.LLM_URL == "http://localhost:1235/v1"
