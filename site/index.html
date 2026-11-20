@@ -715,6 +715,27 @@
   @media (min-width: 1200px) {
     body:not(.hide-images) .page-body { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
   }
+
+  /* AI summary card (result view) */
+  .summary-card { margin-bottom: 16px; }
+  .summary-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .summary-title { margin: 0; font-size: 1rem; }
+  .summary-state { font-size: 0.82rem; color: var(--accent); }
+  .summary-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+  .summary-body { margin-top: 12px; display: grid; gap: 12px; }
+  .summary-doctype { margin: 0; font-size: 0.8rem; color: var(--muted); }
+  .summary-doc-title { margin: 0; font-size: 0.98rem; }
+  .summary-text { margin: 0; line-height: 1.6; }
+  .summary-section h4 { margin: 0 0 4px; font-size: 0.88rem; color: var(--muted); }
+  .summary-list { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+  .summary-list li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+  .summary-page { font: inherit; font-size: 0.82rem; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
+  .summary-value.is-unverified > span:first-child { color: var(--amber); }
+  .summary-warn { color: var(--amber); font-size: 0.82rem; }
+  .summary-error { margin: 0; color: var(--red); }
+  .job-summary { font-size: 0.82rem; color: var(--accent); white-space: nowrap; }
+  .job-summary.is-done { color: var(--green); }
+  .job-summary.is-failed { color: var(--red); }
 </style>
 </head>
 <body>
@@ -857,12 +878,15 @@
         </div>
       </header>
 
+      <section id="summary-card" class="card summary-card" aria-labelledby="summary-card-title" hidden></section>
+
       <div id="results"></div>
     </main>
   </div>
 </div>
 
 <script src="js/jobs_client.js"></script>
+<script src="js/summary_view.js"></script>
 <script>
 (function () {
   "use strict";
@@ -1356,6 +1380,7 @@
     results.replaceChildren();
     pageChips.replaceChildren();
     resultHead.hidden = true;
+    hideSummary();
     currentData = null;
     views = [];
     matches = [];
@@ -1369,6 +1394,7 @@
   }
 
   function renderResult(data) {
+    hideSummary();
     clearTimeout(searchTimer);
     searchTimer = null;
     results.replaceChildren();
@@ -1975,6 +2001,7 @@
   function createJobRow(id) {
     var name = h("span", { class: "job-name" });
     var state = h("span", { class: "job-state" });
+    var summary = h("span", { class: "job-summary", hidden: true });
     var fill = h("div", { class: "job-fill" });
     var meta = h("p", { class: "job-meta" });
     var viewBtn = h("button", { class: "btn", type: "button", text: "ดูผล" });
@@ -1987,7 +2014,7 @@
     var copyBtn = h("button", { class: "btn", type: "button", text: "คัดลอกลิงก์" });
     var delBtn = h("button", { class: "btn", type: "button", text: "ลบ" });
     var row = h("li", { class: "job-row" },
-      h("div", { class: "job-top" }, name, state),
+      h("div", { class: "job-top" }, name, state, summary),
       h("div", { class: "job-bar" }, fill),
       meta,
       h("div", { class: "job-actions" }, viewBtn, txtLink, copyBtn, delBtn));
@@ -1995,7 +2022,7 @@
     viewBtn.addEventListener("click", function () { viewJob(id); });
     copyBtn.addEventListener("click", function () { copyJobLink(id, copyBtn); });
     delBtn.addEventListener("click", function () { deleteJob(id); });
-    return { id: id, row: row, name: name, state: state, fill: fill, meta: meta, viewBtn: viewBtn, txtLink: txtLink, delBtn: delBtn };
+    return { id: id, row: row, name: name, state: state, summary: summary, fill: fill, meta: meta, viewBtn: viewBtn, txtLink: txtLink, delBtn: delBtn };
   }
 
   function updateJobRow(rec, job) {
@@ -2006,6 +2033,11 @@
     rec.state.textContent = stateLabel(job);
     rec.state.className = "job-state" +
       (job.state === "done" ? " is-done" : job.state === "failed" ? " is-failed" : "");
+    var hasSummary = job.summary_state !== undefined && job.summary_state !== null;
+    rec.summary.hidden = !hasSummary;
+    rec.summary.textContent = hasSummary ? SummaryView.stateLabel(job.summary_state) : "";
+    rec.summary.className = "job-summary" +
+      (job.summary_state === "done" ? " is-done" : job.summary_state === "failed" ? " is-failed" : "");
     rec.fill.style.width = Math.round(fraction * 100) + "%";
     rec.meta.textContent = jobDetail(job);
     rec.viewBtn.disabled = !hasResult;
@@ -2096,7 +2128,10 @@
       renderResult(await api("GET", "/api/jobs/" + encodeURIComponent(id) + "/result"));
     } catch (err) {
       showError(err.message);
+      return;
     }
+    currentJobId = id;
+    loadSummary(id);
   }
 
   function copyJobLink(id, btn) {
@@ -2115,6 +2150,151 @@
     }
     if (sharedJobId === id) sharedJobId = null;
     refreshJobs();
+  }
+
+  // ---- AI summary card (pure helpers in js/summary_view.js) ----
+
+  var SUMMARY_POLL_MS = 5000;
+  var summaryCard = document.getElementById("summary-card");
+  var currentJobId = null;     // job whose result is on screen; null for browser-mode results
+  var summaryTimer = null;     // the one pending poll, if any
+  var summaryReq = 0;          // bumped on every load and hide, so a late response is dropped
+  var summaryCollapsed = false;
+
+  // Removes the card and any pending poll. Called whenever a result is rendered or cleared.
+  function hideSummary() {
+    clearTimeout(summaryTimer);
+    summaryTimer = null;
+    summaryReq++;
+    currentJobId = null;
+    summaryCard.replaceChildren();
+    summaryCard.hidden = true;
+  }
+
+  // Fetches the summary of job id and draws the card. Polls while the job is pending or running.
+  async function loadSummary(id) {
+    clearTimeout(summaryTimer);
+    summaryTimer = null;
+    var req = ++summaryReq;
+    var data;
+    try {
+      data = await api("GET", "/api/jobs/" + encodeURIComponent(id) + "/summary");
+    } catch (err) {
+      if (req === summaryReq) showError(err.message);
+      return;
+    }
+    if (req !== summaryReq) return;  // another result was viewed while this request was in flight
+    if (!data.enabled) {
+      summaryCard.replaceChildren();
+      summaryCard.hidden = true;
+      return;
+    }
+    renderSummaryCard(id, data);
+    if (SummaryView.isBusy(data.state)) {
+      summaryTimer = setTimeout(function () { loadSummary(id); }, SUMMARY_POLL_MS);
+    }
+  }
+
+  // "สรุปใหม่": start a new summary, then show whatever the server reports.
+  async function regenerateSummary(id) {
+    try {
+      await api("POST", "/api/jobs/" + encodeURIComponent(id) + "/summary");
+    } catch (err) {
+      if (id === currentJobId) showError(err.message);
+    }
+    if (id === currentJobId) loadSummary(id);
+  }
+
+  function renderSummaryCard(id, data) {
+    var state = data.state;
+    var result = state === "done" ? data.result : null;
+    var stateText = [
+      SummaryView.stateLabel(state),
+      state === "running" ? SummaryView.progressText(data.progress) : ""
+    ].filter(Boolean).join(" · ");
+
+    var toggle = h("button", { class: "btn", type: "button", "aria-expanded": summaryCollapsed ? "false" : "true", text: summaryCollapsed ? "ขยาย" : "ย่อ" });
+    var copyBtn = h("button", { class: "btn", type: "button", text: "คัดลอกสรุป", disabled: !result });
+    var regenBtn = h("button", { class: "btn", type: "button", text: "สรุปใหม่", disabled: SummaryView.isBusy(state) });
+    var body = h("div", { class: "summary-body" });
+    body.hidden = summaryCollapsed;
+
+    if (result) fillSummaryBody(body, result);
+    else if (state === "failed" && data.error) body.appendChild(h("p", { class: "summary-error", text: data.error }));
+
+    toggle.addEventListener("click", function () {
+      summaryCollapsed = !summaryCollapsed;
+      body.hidden = summaryCollapsed;
+      toggle.textContent = summaryCollapsed ? "ขยาย" : "ย่อ";
+      toggle.setAttribute("aria-expanded", summaryCollapsed ? "false" : "true");
+    });
+    copyBtn.addEventListener("click", function () {
+      navigator.clipboard.writeText(SummaryView.summaryToText(result)).then(function () {
+        flash(copyBtn, "คัดลอกแล้ว", "คัดลอกสรุป");
+      }, function () {});
+    });
+    regenBtn.addEventListener("click", function () { regenerateSummary(id); });
+
+    var head = h("div", { class: "summary-head" },
+      h("h2", { id: "summary-card-title", class: "summary-title", text: "สรุปโดย AI (อาจผิดพลาด)" }),
+      h("span", { class: "summary-state", text: stateText }),
+      h("div", { class: "summary-actions" }, copyBtn, regenBtn, toggle));
+    summaryCard.replaceChildren(head, body);
+    summaryCard.hidden = false;
+  }
+
+  function fillSummaryBody(body, r) {
+    body.appendChild(h("p", { class: "summary-doctype", text: r.doc_type }));
+    body.appendChild(h("h3", { class: "summary-doc-title", text: r.title }));
+    body.appendChild(h("p", { class: "summary-text", text: r.summary }));
+
+    var keyPoints = h("ul", { class: "summary-list" });
+    r.key_points.forEach(function (kp) {
+      keyPoints.appendChild(h("li", null, h("span", { text: kp.text }), pageButton(kp.page)));
+    });
+    body.appendChild(summarySection("ประเด็นสำคัญ", keyPoints));
+
+    var parties = h("ul", { class: "summary-list" });
+    r.parties.forEach(function (p) { parties.appendChild(h("li", null, h("span", { text: p }))); });
+    body.appendChild(summarySection("ผู้เกี่ยวข้อง", parties));
+
+    body.appendChild(summarySection("วันที่", valueList(r.dates)));
+    body.appendChild(summarySection("จำนวนเงิน", valueList(r.amounts)));
+  }
+
+  function summarySection(heading, content) {
+    return h("section", { class: "summary-section" }, h("h4", { text: heading }), content);
+  }
+
+  // Dates and amounts. A value the OCR text does not contain (check "none") gets the warning mark.
+  function valueList(items) {
+    var list = h("ul", { class: "summary-list" });
+    items.forEach(function (item) {
+      var unverified = item.check === "none";
+      list.appendChild(h("li", { class: unverified ? "summary-value is-unverified" : "summary-value" },
+        h("span", { text: item.label + ": " + item.value }),
+        pageButton(item.page),
+        unverified ? h("span", { class: "summary-warn", text: "⚠ ไม่พบในข้อความ OCR" }) : null));
+    });
+    return list;
+  }
+
+  function pageButton(page) {
+    if (page === null || page === undefined) return null;
+    var btn = h("button", { class: "summary-page", type: "button", text: "หน้า " + page });
+    btn.addEventListener("click", function () { jumpToPage(page); });
+    return btn;
+  }
+
+  // Scrolls to a page's section. A page that is not selected is added to the selection first, as a page chip does.
+  function jumpToPage(pageNumber) {
+    var match = views.filter(function (v) { return v.page.number === pageNumber; })[0];
+    if (!match) return;
+    if (!match.check.checked) {
+      match.check.checked = true;
+      updatePickUI();
+    }
+    match.section.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
   // ---- init ----
