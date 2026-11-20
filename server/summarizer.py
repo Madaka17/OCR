@@ -138,8 +138,29 @@ SUMMARY_CHARS = 1500
 FIELD_CHARS = 200
 
 
+PAGES_RESERVE = 30  # room for the "pages" tag added after compaction
+
+
+def _size(note: dict) -> int:
+    return len(json.dumps(note, ensure_ascii=False))
+
+
+def _fit(c: dict) -> dict:
+    """Shrink a note to half the reduce budget: drop list items, then cut the summary."""
+    budget = REDUCE_CHARS // 2 - PAGES_RESERVE
+    order = ("amounts", "dates", "parties", "key_points")
+    while _size(c) > budget and any(c[k] for k in order):
+        for k in order:
+            if c[k] and _size(c) > budget:
+                c[k].pop()
+    while _size(c) > budget and c["summary"]:
+        excess = _size(c) - budget
+        c["summary"] = c["summary"][:max(0, len(c["summary"]) - excess)]
+    return c
+
+
 def _compact(raw: dict, page_count: int) -> dict:
-    """Normalize a note and cap its size so a reduce batch stays within budget."""
+    """Normalize a note so it fits half the reduce budget, so any reduce batch fits."""
     c = sanitize(raw, page_count)
     c["summary"] = c["summary"][:SUMMARY_CHARS]
     c["doc_type"] = c["doc_type"][:FIELD_CHARS]
@@ -150,7 +171,7 @@ def _compact(raw: dict, page_count: int) -> dict:
             {k: (v[:FIELD_CHARS] if isinstance(v, str) else v) for k, v in item.items()}
             for item in c[key]
         ]
-    return c
+    return _fit(c)
 
 
 def _batches(notes: list[dict]) -> list[list[dict]]:

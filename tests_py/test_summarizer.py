@@ -165,20 +165,31 @@ def test_notes_compacted_before_reduce():
             assert len(note["amounts"]) <= 10
 
 
-def test_large_notes_terminate():
+def _worst_note():
     item = {"label": "L" * 200, "value": "V" * 200, "page": 1}
-    big = {
+    return {
         "summary": "s" * 1500,
         "key_points": [{"text": "k" * 200, "page": 1} for _ in range(8)],
         "parties": ["p" * 200 for _ in range(10)],
         "dates": [dict(item) for _ in range(10)],
         "amounts": [dict(item) for _ in range(10)],
     }
-    llm = FakeLLM(chunk_note=big)
+
+
+def test_large_notes_terminate():
+    llm = FakeLLM(chunk_note=_worst_note())
     pages = [page(n, "x" * 9000) for n in range(1, 11)]
     result = summarize(llm, pages, "f.pdf")
     assert isinstance(result, dict)
-    assert len(llm.prompts("document_summary")) < 20
+    prompts = llm.prompts("document_summary")
+    assert len(prompts) < 20
+    assert all(len(p) < REDUCE_CHARS + 3000 for p in prompts)
+
+
+def test_compact_note_fits_half_budget():
+    out = summarizer._compact(_worst_note(), 10)
+    assert len(json.dumps(out, ensure_ascii=False)) <= REDUCE_CHARS // 2
+    assert len(out["key_points"]) >= 1
 
 
 def test_max_tokens_per_stage():
