@@ -229,3 +229,25 @@ def test_page_read_error_repends(store, make_worker):
     assert make_worker().step(now=10.0) is True
 
     assert store.read_summary(job_id)["state"] == "pending"
+
+
+def test_persistent_final_write_failure_fails_after_three(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    real_write = store.write_summary
+
+    def fail_on_done(job, data):
+        if data["state"] == "done":
+            raise OSError("disk full")
+        return real_write(job, data)
+
+    store.write_summary = fail_on_done
+    worker = make_worker()
+    now = 10.0
+    for _ in range(3):
+        worker.step(now)
+        now = (store.read_summary(job_id)["next_try_at"] or now) + 1
+
+    record = store.read_summary(job_id)
+    assert record["state"] == "failed"
+    assert record["attempts"] == 3
+    assert "disk full" in record["error"]

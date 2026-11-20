@@ -133,9 +133,18 @@ class SummaryWorker:
             self._repend(job_id, now, prev, e)
 
     def _repend(self, job_id: str, now: float, prev: dict, error: BaseException) -> None:
+        """Count the failure like any other error: retry with growing delay, fail at the limit."""
+        attempts = prev.get("attempts", 0) + 1
+        self._last_error = str(error)
         try:
-            self._put(job_id, now, prev, state="pending", next_try_at=now + RETRY_STEP_SECONDS,
-                      error=_clip(error), progress=None)
+            with self._mu:
+                if attempts < ATTEMPT_LIMIT:
+                    self._put(job_id, now, prev, state="pending", attempts=attempts,
+                              next_try_at=now + RETRY_STEP_SECONDS * attempts,
+                              error=_clip(error), progress=None)
+                else:
+                    self._put(job_id, now, prev, state="failed", attempts=attempts,
+                              error=_clip(error), progress=None)
         except OSError as e:
             self._report("could not re-pend job, recover() will", e)
 
