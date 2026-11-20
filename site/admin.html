@@ -120,6 +120,26 @@
   </section>
 
   <section>
+    <h2>สรุปด้วย AI</h2>
+    <p class="empty" id="llm-off" hidden>ปิดอยู่ (ตั้ง OCR_LLM_URL เพื่อเปิด)</p>
+    <div id="llm-on" hidden>
+      <div class="tiles">
+        <div class="tile"><div class="label">โมเดล</div><div class="value" id="llm-model">–</div></div>
+        <div class="tile"><div class="label">URL</div><div class="value" id="llm-url">–</div></div>
+        <div class="tile"><div class="label">สำเร็จล่าสุด</div><div class="value" id="llm-ok">–</div></div>
+        <div class="tile"><div class="label">ข้อผิดพลาดล่าสุด</div><div class="value" id="llm-error">–</div></div>
+      </div>
+      <div class="tiles">
+        <div class="tile"><div class="label">รอสรุป</div><div class="value" id="llm-pending">–</div></div>
+        <div class="tile"><div class="label">กำลังสรุป</div><div class="value" id="llm-running">–</div></div>
+        <div class="tile"><div class="label">สรุปแล้ว</div><div class="value" id="llm-done">–</div></div>
+        <div class="tile"><div class="label">สรุปไม่สำเร็จ</div><div class="value" id="llm-failed">–</div></div>
+        <div class="tile"><div class="label">ข้อความสั้น</div><div class="value" id="llm-short">–</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <h2>คิวงาน</h2>
     <div class="wrap">
       <table>
@@ -254,6 +274,23 @@
     });
   }
 
+  function renderLlm(llm) {
+    var on = !!(llm && llm.enabled);
+    $('llm-off').hidden = on;
+    $('llm-on').hidden = !on;
+    if (!on) return;
+    $('llm-model').textContent = llm.model || '–';
+    $('llm-url').textContent = llm.url || '–';
+    $('llm-ok').textContent = llm.last_ok_at == null ? 'ยังไม่เคย' : fmtTime(llm.last_ok_at);
+    $('llm-error').textContent = llm.last_error ? String(llm.last_error).slice(0, 200) : '-';
+    var c = llm.counts || {};
+    $('llm-pending').textContent = fmtNum(c.pending || 0);
+    $('llm-running').textContent = fmtNum(c.running || 0);
+    $('llm-done').textContent = fmtNum(c.done || 0);
+    $('llm-failed').textContent = fmtNum(c.failed || 0);
+    $('llm-short').textContent = fmtNum(c.short || 0);
+  }
+
   function render(d) {
     var r = d.resources;
     $('cpu').textContent = fmtNum(r.cpu_percent) + '%';
@@ -275,6 +312,7 @@
 
     renderJobs(d.jobs);
     renderErrors(d.errors);
+    renderLlm(d.llm);
   }
 
   function redirectToLogin() {
