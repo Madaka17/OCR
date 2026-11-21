@@ -5,8 +5,9 @@ merged in levels until one document summary remains (reduce). The llm object
 is duck-typed: anything with complete(prompt, schema, name, max_tokens).
 """
 
+import contextlib
 import json
-from concurrent.futures import ThreadPoolExecutor
+import threading
 
 from server.factcheck import check_items
 
@@ -192,6 +193,56 @@ def _span(batch: list[dict]) -> str:
     return f"{batch[0]['pages'].split('-')[0]}-{batch[-1]['pages'].split('-')[-1]}"
 
 
+def _parallel_map(fn, items, workers: int = PARALLEL):
+    """Like ThreadPoolExecutor.map, but on daemon threads.
+
+    Executor threads are joined at interpreter exit, so one LLM call in flight
+    (timeout 600 s) would hold Ctrl+C for up to ten minutes. Daemon threads die
+    with the process. Results come back in input order. After the first failure
+    no new call starts, and that failure is raised. Closing the generator early
+    (the caller raised) also stops new calls.
+    """
+    items = list(items)
+    results = [None] * len(items)
+    done = [False] * len(items)
+    errors: list[BaseException] = []
+    cond = threading.Condition()
+    claimed = 0
+    closed = False
+
+    def work():
+        nonlocal claimed
+        while True:
+            with cond:
+                if errors or closed or claimed >= len(items):
+                    return
+                i = claimed
+                claimed += 1
+            try:
+                value = fn(items[i])
+            except BaseException as e:
+                with cond:
+                    errors.append(e)
+                    cond.notify_all()
+                return
+            with cond:
+                results[i] = value
+                done[i] = True
+                cond.notify_all()
+
+    for n in range(min(workers, len(items))):
+        threading.Thread(target=work, name=f"summary-call-{n}", daemon=True).start()
+    try:
+        for i in range(len(items)):
+            with cond:
+                cond.wait_for(lambda: done[i] or errors)
+                if not done[i]:
+                    raise errors[0]
+            yield results[i]
+    finally:
+        with cond:
+            closed = True
+
 def summarize(llm, pages: list[dict], filename: str, on_progress=None) -> dict:
     texts = page_texts(pages)
     if sum(len(t) for _, t in texts) < SHORT_CHARS:
@@ -213,28 +264,28 @@ def summarize(llm, pages: list[dict], filename: str, on_progress=None) -> dict:
         out["pages"] = _span(batch)
         return out
 
-    with ThreadPoolExecutor(PARALLEL) as pool:
-        mapped = []
-        for i, m in enumerate(pool.map(run_map, chunks), 1):
+    mapped = []
+    with contextlib.closing(_parallel_map(run_map, chunks)) as results:
+        for i, m in enumerate(results, 1):
             mapped.append(m)
             if on_progress:
                 on_progress(i, len(chunks))
-        notes = []
-        for c, m in zip(chunks, mapped):
-            note = _compact(m, len(pages))
-            note["pages"] = f"{c[0][0]}-{c[-1][0]}"
-            notes.append(note)
+    notes = []
+    for c, m in zip(chunks, mapped):
+        note = _compact(m, len(pages))
+        note["pages"] = f"{c[0][0]}-{c[-1][0]}"
+        notes.append(note)
 
-        reduced = False
-        while len(notes) > 1:
-            batches = _batches(notes)
-            if len(batches) >= len(notes):
-                # No progress: force-pair so the level always shrinks.
-                batches = [notes[i:i + 2] for i in range(0, len(notes), 2)]
-            notes = list(pool.map(run_reduce, batches))
-            reduced = True
+    reduced = False
+    while len(notes) > 1:
+        batches = _batches(notes)
+        if len(batches) >= len(notes):
+            # No progress: force-pair so the level always shrinks.
+            batches = [notes[i:i + 2] for i in range(0, len(notes), 2)]
+        notes = list(_parallel_map(run_reduce, batches))
+        reduced = True
 
-        final = notes[0] if reduced else run_reduce([notes[0]])
+    final = notes[0] if reduced else run_reduce([notes[0]])
 
     result = sanitize(final, len(pages))
     page_text = {p["number"]: p.get("text", "") for p in pages}

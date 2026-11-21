@@ -1,6 +1,7 @@
 import copy
 import json
 import threading
+import time
 
 import pytest
 
@@ -198,3 +199,85 @@ def test_max_tokens_per_stage():
     by_name = {name: mt for name, _, mt in llm.calls}
     assert by_name["chunk_notes"] == 2000
     assert by_name["document_summary"] == 3000
+
+
+class FailingLLM(FakeLLM):
+    """Fails the first chunk call; counts every chunk call made."""
+
+    def complete(self, prompt, schema, name, max_tokens):
+        if name == "chunk_notes":
+            with self._lock:
+                first = not self.prompts("chunk_notes")
+                self.calls.append((name, prompt, max_tokens))
+            if first:
+                raise RuntimeError("boom")
+            return super().complete(prompt, schema, name, max_tokens)
+        return super().complete(prompt, schema, name, max_tokens)
+
+
+def test_map_error_stops_new_calls():
+    llm = FailingLLM()
+    pages = [page(n, "x" * 9000) for n in range(1, 21)]
+    with pytest.raises(RuntimeError, match="boom"):
+        summarize(llm, pages, "f.pdf")
+    # Only calls already in flight when the first one failed may still run.
+    assert len(llm.prompts("chunk_notes")) <= 2 * summarizer.PARALLEL
+
+
+def test_map_results_keep_chunk_order():
+    llm = FakeLLM()
+    pages = [page(n, "x" * 9000) for n in range(1, 8)]
+    summarize(llm, pages, "f.pdf")
+    reduce_prompt = llm.prompts("document_summary")[0]
+    spans = [n["pages"] for n in _notes_in(reduce_prompt)]
+    assert spans == sorted(spans, key=lambda s: int(s.split("-")[0]))
+
+
+def test_in_flight_llm_call_never_blocks_exit(tmp_path):
+    """Ctrl+C must not wait for the model: the process exits with a call still open."""
+    import subprocess
+    import sys
+    import textwrap
+
+    from tests_py.conftest import PROJECT_ROOT
+
+    script = tmp_path / "hang.py"
+    script.write_text(textwrap.dedent(f"""
+        import sys, threading
+        sys.path.insert(0, {str(PROJECT_ROOT)!r})
+        from server import summarizer
+
+        started = threading.Event()
+
+        class HangingLLM:
+            def complete(self, prompt, schema, name, max_tokens):
+                started.set()
+                threading.Event().wait()  # never answers
+
+        pages = [{{"number": 1, "text": "x" * 500, "lines": [{{"text": "x" * 500, "confidence": 0.9}}]}}]
+        threading.Thread(target=summarizer.summarize, args=(HangingLLM(), pages, "f.pdf"), daemon=True).start()
+        started.wait(10)
+        print("exiting", flush=True)
+    """), encoding="utf-8")
+    proc = subprocess.run([sys.executable, str(script)], capture_output=True, text=True, timeout=30)
+    assert proc.returncode == 0, proc.stderr
+    assert "exiting" in proc.stdout
+
+
+class SlowLLM(FakeLLM):
+    def complete(self, prompt, schema, name, max_tokens):
+        time.sleep(0.05)
+        return super().complete(prompt, schema, name, max_tokens)
+
+
+def test_progress_error_stops_new_calls():
+    llm = SlowLLM()
+    pages = [page(n, "x" * 9000) for n in range(1, 21)]
+
+    def explode(done, total):
+        raise OSError("disk full")
+
+    with pytest.raises(OSError):
+        summarize(llm, pages, "f.pdf", on_progress=explode)
+    time.sleep(0.2)  # let in-flight calls settle
+    assert len(llm.prompts("chunk_notes")) <= 2 * summarizer.PARALLEL
