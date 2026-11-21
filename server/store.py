@@ -7,6 +7,7 @@ import shutil
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 from server import settings
@@ -28,6 +29,23 @@ class JobError(Exception):
         self.message = message
 
 
+# On Windows, os.replace fails with PermissionError while another thread has the
+# target open (a status poll reading summary.json or meta.json). The reader holds it
+# for well under a millisecond, so a few short retries ride it out.
+SHARING_RETRIES = 10
+SHARING_RETRY_SECONDS = 0.01
+
+
+def _retry_sharing(fn, *args):
+    for attempt in range(SHARING_RETRIES):
+        try:
+            return fn(*args)
+        except PermissionError:
+            if attempt == SHARING_RETRIES - 1:
+                raise
+            time.sleep(SHARING_RETRY_SECONDS * (attempt + 1))
+
+
 def _atomic_write(path: Path, data: bytes) -> None:
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
     try:
@@ -35,7 +53,7 @@ def _atomic_write(path: Path, data: bytes) -> None:
             f.write(data)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, path)
+        _retry_sharing(os.replace, tmp, path)
     except BaseException:
         if os.path.exists(tmp):
             os.unlink(tmp)
@@ -71,7 +89,7 @@ class JobStore:
     def _read_json_file(self, path: Path) -> dict | None:
         """Parsed JSON object, or None when the file is missing or unreadable."""
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            return json.loads(_retry_sharing(path.read_text, "utf-8"))
         except FileNotFoundError:
             return None
         except (ValueError, OSError) as e:

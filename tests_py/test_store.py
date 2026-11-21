@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 
 from server import settings
 from server.store import JobError
@@ -317,3 +318,55 @@ def test_write_summary_skips_deleted_job(store, tmp_path):
 
     assert store.write_summary(job["id"], {"state": "pending"}) is False
     assert not (tmp_path / "jobs" / job["id"]).exists()
+
+
+# ----- Windows sharing violations (os.replace while a reader has the file open) --
+
+def test_atomic_write_retries_replace_on_permission_error(monkeypatch, tmp_path):
+    from server import store as store_mod
+
+    real_replace = store_mod.os.replace
+    failures = [PermissionError(13, "Access is denied")] * 2
+
+    def flaky_replace(a, b):
+        if failures:
+            raise failures.pop()
+        return real_replace(a, b)
+
+    monkeypatch.setattr(store_mod.os, "replace", flaky_replace)
+    monkeypatch.setattr(store_mod.time, "sleep", lambda s: None)
+    target = tmp_path / "x.json"
+    store_mod._atomic_write(target, b"{}")
+    assert target.read_bytes() == b"{}"
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_atomic_write_gives_up_after_retries(monkeypatch, tmp_path):
+    from server import store as store_mod
+
+    def always_denied(a, b):
+        raise PermissionError(13, "Access is denied")
+
+    monkeypatch.setattr(store_mod.os, "replace", always_denied)
+    monkeypatch.setattr(store_mod.time, "sleep", lambda s: None)
+    with pytest.raises(PermissionError):
+        store_mod._atomic_write(tmp_path / "x.json", b"{}")
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_read_retries_on_permission_error(store, monkeypatch):
+    from server import store as store_mod
+
+    job = store.create("u1", "doc.pdf", 4, now=0)
+    store.write_summary(job["id"], {"state": "running"})
+    real_read_text = Path.read_text
+    failures = [PermissionError(13, "Access is denied")]
+
+    def flaky_read_text(self, *args, **kwargs):
+        if self.name == "summary.json" and failures:
+            raise failures.pop()
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", flaky_read_text)
+    monkeypatch.setattr(store_mod.time, "sleep", lambda s: None)
+    assert store.read_summary(job["id"]) == {"state": "running"}
