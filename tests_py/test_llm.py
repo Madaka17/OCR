@@ -139,3 +139,21 @@ def test_settings_default_not_leaked_to_later_tests():
     if "OCR_LLM_URL" in os.environ:
         pytest.skip("OCR_LLM_URL is set in the real environment")
     assert settings.LLM_URL == "http://localhost:1235/v1"
+
+
+def test_read_timeout_raises_llm_error_not_unavailable():
+    """A call that runs past the timeout counts as an attempt, so it cannot retry forever."""
+    import socket
+
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    accepted = []
+    threading.Thread(target=lambda: accepted.append(listener.accept()), daemon=True).start()
+    try:
+        client = LLMClient(f"http://127.0.0.1:{listener.getsockname()[1]}/v1", "m", timeout=0.5)
+        with pytest.raises(LLMError) as info:
+            client.complete("hi", SCHEMA, "thing", 50)
+        assert not isinstance(info.value, LLMUnavailable)
+    finally:
+        listener.close()
