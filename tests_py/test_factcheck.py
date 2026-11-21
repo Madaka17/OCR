@@ -44,3 +44,20 @@ def test_check_items_corrects_page_and_flags_missing():
     out = check_items(items, PAGES)
     assert [(i["page"], i["check"]) for i in out] == [(5, "ok"), (113, "none"), (1, "none")]
     assert items[0]["page"] == 9  # input not mutated
+
+
+def test_month_year_date_found_after_a_day():
+    assert find_value("พฤษภาคม 2568", PAGES) == [81]
+
+
+def test_cut_off_year_not_found():
+    assert find_value("8 พฤษภาคม 256", PAGES) == []
+
+
+def test_whole_amount_not_matched_against_decimal_amount():
+    assert find_value("136,531,093 บาท", PAGES) == []
+    assert find_value("1.0", {1: "อัตรา 1.05"}) == []
+
+
+def test_amount_before_sentence_full_stop_still_found():
+    assert find_value("34,358,800", {33: "อาคาร 34,358,800."}) == [33]

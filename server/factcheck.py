@@ -45,14 +45,18 @@ def find_value(value: str, pages: dict[int, str]) -> list[int]:
     """Return sorted page numbers whose normalized text contains the value."""
     nv = normalize(value)
     if any(month in nv for month in _FULL_MONTHS):
-        pattern = re.compile(r"(?<!\d)" + re.escape(nv))
+        # Digit guards only where the value itself starts or ends with a digit, so
+        # "พฤษภาคม 2568" still matches after a day and "256" never matches "2567".
+        before = r"(?<!\d)" if nv[:1].isdigit() else ""
+        after = r"(?!\d)" if nv[-1:].isdigit() else ""
+        pattern = re.compile(before + re.escape(nv) + after)
         return sorted(p for p, text in pages.items() if pattern.search(normalize(text)))
 
     numbers = _numbers(nv)
     if not numbers:
         return []
     patterns = [
-        re.compile(r"(?<![\d,.])" + re.escape(n) + r"(?:\.0+)?(?![\d,])") for n in numbers
+        re.compile(r"(?<![\d,.])" + re.escape(n) + r"(?:\.0+)?(?![\d,]|\.\d)") for n in numbers
     ]
     return sorted(
         p for p, text in pages.items()
