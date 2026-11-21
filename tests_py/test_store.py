@@ -335,6 +335,7 @@ def test_atomic_write_retries_replace_on_permission_error(monkeypatch, tmp_path)
 
     monkeypatch.setattr(store_mod.os, "replace", flaky_replace)
     monkeypatch.setattr(store_mod.time, "sleep", lambda s: None)
+    monkeypatch.setattr(store_mod, "SHARING_RETRIES", 10)
     target = tmp_path / "x.json"
     store_mod._atomic_write(target, b"{}")
     assert target.read_bytes() == b"{}"
@@ -349,6 +350,7 @@ def test_atomic_write_gives_up_after_retries(monkeypatch, tmp_path):
 
     monkeypatch.setattr(store_mod.os, "replace", always_denied)
     monkeypatch.setattr(store_mod.time, "sleep", lambda s: None)
+    monkeypatch.setattr(store_mod, "SHARING_RETRIES", 10)
     with pytest.raises(PermissionError):
         store_mod._atomic_write(tmp_path / "x.json", b"{}")
     assert not list(tmp_path.glob("*.tmp"))
@@ -369,4 +371,5 @@ def test_read_retries_on_permission_error(store, monkeypatch):
 
     monkeypatch.setattr(Path, "read_text", flaky_read_text)
     monkeypatch.setattr(store_mod.time, "sleep", lambda s: None)
+    monkeypatch.setattr(store_mod, "SHARING_RETRIES", 10)
     assert store.read_summary(job["id"]) == {"state": "running"}

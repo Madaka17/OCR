@@ -100,7 +100,8 @@ class SummaryWorker:
     def scan(self, now: float) -> None:
         with self._mu:
             for meta in self.store.list(None):
-                if meta["state"] == "done" and self.store.read_summary(meta["id"]) is None:
+                # has_summary, not read_summary: an unreadable record must not be reset.
+                if meta["state"] == "done" and not self.store.has_summary(meta["id"]):
                     self._put(meta["id"], now, {}, state="pending", attempts=0, next_try_at=0)
 
     def next_job(self, now: float) -> str | None:
@@ -127,16 +128,24 @@ class SummaryWorker:
         meta = self.store.get(job_id)
         if meta is None:
             return
+        # A run can take many minutes. Times written during or after it (updated_at,
+        # next_try_at, last_ok_at) count from `now` plus the time spent so far.
+        started = time.monotonic()
+
+        def clock() -> float:
+            return now + (time.monotonic() - started)
+
         with self._mu:
             prev = self.store.read_summary(job_id) or {}
-            if self._put(job_id, now, prev, state="running", progress=[0, meta["pages"]]) is None:
+            # progress stays None until the first chunk: the chunk count is not known yet.
+            if self._put(job_id, now, prev, state="running", progress=None) is None:
                 return
         try:
-            self._summarize_and_store(job_id, meta, prev, now)
+            self._summarize_and_store(job_id, meta, prev, clock)
         except Exception as e:
             # Any failure after the running write must not leave the record stuck at running.
             self._report(f"summary of {job_id} interrupted, will retry", e)
-            self._repend(job_id, now, prev, e)
+            self._repend(job_id, clock(), prev, e)
 
     def _repend(self, job_id: str, now: float, prev: dict, error: BaseException) -> None:
         """Count the failure like any other error: retry with growing delay, fail at the limit."""
@@ -154,7 +163,7 @@ class SummaryWorker:
         except OSError as e:
             self._report("could not re-pend job, recover() will", e)
 
-    def _summarize_and_store(self, job_id: str, meta: dict, prev: dict, now: float) -> None:
+    def _summarize_and_store(self, job_id: str, meta: dict, prev: dict, clock) -> None:
         pages = []
         for number in range(1, meta["pages"] + 1):
             page = self.store.read_page(job_id, number)
@@ -162,19 +171,23 @@ class SummaryWorker:
                 pages.append(page)
 
         def progress(done: int, total: int) -> None:
-            self._put(job_id, now, prev, state="running", progress=[done, total])
+            self._put(job_id, clock(), prev, state="running", progress=[done, total])
 
         try:
-            result = summarizer.summarize(self.llm, pages, meta["filename"], on_progress=progress)
+            result = summarizer.summarize(self.llm, pages, meta["filename"], on_progress=progress,
+                                          page_count=meta["pages"])
         except summarizer.ShortText:
+            now = clock()
             self._put(job_id, now, prev, state="short", result=None, progress=None)
         except LLMUnavailable as e:
+            now = clock()
             waits = prev.get("waits", 0) + 1
             delay = min(UNAVAILABLE_CAP_SECONDS, UNAVAILABLE_BASE_SECONDS * 2 ** (waits - 1))
             self._last_error = str(e)
             self._put(job_id, now, prev, state="pending", waits=waits,
                          next_try_at=now + delay, error=_clip(e), progress=None)
         except Exception as e:
+            now = clock()
             attempts = prev.get("attempts", 0) + 1
             self._last_error = str(e)
             if attempts < ATTEMPT_LIMIT:
@@ -184,6 +197,7 @@ class SummaryWorker:
                 self._put(job_id, now, prev, state="failed", attempts=attempts, waits=0,
                              error=_clip(e), progress=None)
         else:
+            now = clock()
             self._put(job_id, now, prev, state="done", result=result, waits=0, error=None, progress=None)
             self._last_ok_at = now
             self._last_error = None

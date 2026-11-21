@@ -106,7 +106,7 @@ def test_unavailable_never_fails(store, make_worker):
         record = store.read_summary(job_id)
         assert record["state"] == "pending"
         assert record["attempts"] == 0
-        assert record["next_try_at"] - now <= 300
+        assert record["next_try_at"] - now <= 300 + 1  # delay counts from the end of the run
         now = record["next_try_at"] + 1
 
     llm.error = None
@@ -278,3 +278,56 @@ def test_stop_returns_within_bound_while_llm_call_blocks(store, make_worker):
         assert elapsed < 6.5
     finally:
         release.set()
+
+
+def test_scan_keeps_summary_it_cannot_read(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    store.write_summary(job_id, {"state": "done", "updated_at": 1.0, "attempts": 0, "waits": 0,
+                                 "next_try_at": 0, "error": None, "progress": None,
+                                 "model": "m", "result": {"title": "kept"}})
+    real_read = store.read_summary
+    store.read_summary = lambda j: None  # unreadable, not missing
+    make_worker().scan(now=10.0)
+    store.read_summary = real_read
+    assert store.read_summary(job_id)["result"] == {"title": "kept"}
+
+
+def test_running_write_has_no_page_count_progress(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT] * 3, finished_at=1.0)
+    seen = []
+    llm = FakeLLM(on_call=lambda: seen.append(store.read_summary(job_id)["progress"]))
+    make_worker(llm=llm).step(now=10.0)
+    # Before any chunk finishes the counter is unknown, never [0, pages].
+    assert seen[0] is None
+
+
+def test_retry_delay_counts_from_end_of_long_run(store, make_worker, monkeypatch):
+    from server import summary_worker as sw
+
+    clock = [1000.0]
+    monkeypatch.setattr(sw.time, "monotonic", lambda: clock[0])
+
+    def slow_failure():
+        clock[0] += 900  # the call took 15 minutes
+
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    make_worker(llm=FakeLLM(error=LLMError("bad"), on_call=slow_failure)).step(now=10.0)
+    record = store.read_summary(job_id)
+    assert record["next_try_at"] >= 10.0 + 900 + sw.RETRY_STEP_SECONDS
+    assert record["updated_at"] >= 10.0 + 900
+
+
+def test_summarize_gets_real_page_count(store, make_worker, monkeypatch):
+    from server import summary_worker as sw
+
+    job_id = make_done_job(store, [PAGE_TEXT] * 3, finished_at=1.0)
+    (store.jobs_dir / job_id / "pages" / "2.json").unlink()
+    got = {}
+
+    def fake_summarize(llm, pages, filename, on_progress=None, page_count=None):
+        got["count"] = page_count
+        raise sw.summarizer.ShortText()
+
+    monkeypatch.setattr(sw.summarizer, "summarize", fake_summarize)
+    make_worker().step(now=10.0)
+    assert got["count"] == 3

@@ -31,8 +31,9 @@ class JobError(Exception):
 
 # On Windows, os.replace fails with PermissionError while another thread has the
 # target open (a status poll reading summary.json or meta.json). The reader holds it
-# for well under a millisecond, so a few short retries ride it out.
-SHARING_RETRIES = 10
+# for well under a millisecond, so a few short retries ride it out. Elsewhere a
+# PermissionError is a real permission problem, so it is raised at once.
+SHARING_RETRIES = 10 if os.name == "nt" else 1
 SHARING_RETRY_SECONDS = 0.01
 
 
@@ -227,6 +228,10 @@ class JobStore:
         if not _valid_id(job_id):
             return None
         return self._read_json_file(self._job_dir(job_id) / "summary.json")
+
+    def has_summary(self, job_id: str) -> bool:
+        """True when summary.json exists, even if it cannot be read right now."""
+        return _valid_id(job_id) and (self._job_dir(job_id) / "summary.json").exists()
 
     def write_summary(self, job_id: str, data: dict) -> bool:
         """Atomically write summary.json. Writes nothing when the job's meta.json is gone."""

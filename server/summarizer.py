@@ -243,7 +243,9 @@ def _parallel_map(fn, items, workers: int = PARALLEL):
         with cond:
             closed = True
 
-def summarize(llm, pages: list[dict], filename: str, on_progress=None) -> dict:
+def summarize(llm, pages: list[dict], filename: str, on_progress=None, page_count: int | None = None) -> dict:
+    """page_count is the job's real page count; pages may lack some that could not be read."""
+    total = page_count or len(pages)
     texts = page_texts(pages)
     if sum(len(t) for _, t in texts) < SHORT_CHARS:
         raise ShortText()
@@ -257,10 +259,10 @@ def summarize(llm, pages: list[dict], filename: str, on_progress=None) -> dict:
 
     def run_reduce(batch):
         prompt = REDUCE_PROMPT.format(
-            pages=len(pages), filename=filename,
+            pages=total, filename=filename,
             notes=json.dumps(batch, ensure_ascii=False),
         )
-        out = _compact(llm.complete(prompt, REDUCE_SCHEMA, "document_summary", 3000), len(pages))
+        out = _compact(llm.complete(prompt, REDUCE_SCHEMA, "document_summary", 3000), total)
         out["pages"] = _span(batch)
         return out
 
@@ -272,7 +274,7 @@ def summarize(llm, pages: list[dict], filename: str, on_progress=None) -> dict:
                 on_progress(i, len(chunks))
     notes = []
     for c, m in zip(chunks, mapped):
-        note = _compact(m, len(pages))
+        note = _compact(m, total)
         note["pages"] = f"{c[0][0]}-{c[-1][0]}"
         notes.append(note)
 
@@ -287,7 +289,7 @@ def summarize(llm, pages: list[dict], filename: str, on_progress=None) -> dict:
 
     final = notes[0] if reduced else run_reduce([notes[0]])
 
-    result = sanitize(final, len(pages))
+    result = sanitize(final, total)
     page_text = {p["number"]: p.get("text", "") for p in pages}
     result["dates"] = check_items(result["dates"], page_text)
     result["amounts"] = check_items(result["amounts"], page_text)

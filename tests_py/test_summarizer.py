@@ -281,3 +281,18 @@ def test_progress_error_stops_new_calls():
         summarize(llm, pages, "f.pdf", on_progress=explode)
     time.sleep(0.2)  # let in-flight calls settle
     assert len(llm.prompts("chunk_notes")) <= 2 * summarizer.PARALLEL
+
+
+def test_page_count_keeps_refs_to_last_page_when_a_page_is_missing():
+    class CitesLastPage(FakeLLM):
+        def complete(self, prompt, schema, name, max_tokens):
+            out = super().complete(prompt, schema, name, max_tokens)
+            if name == "document_summary":
+                out["key_points"] = [{"text": "k", "page": 10}]
+            return out
+
+    llm = CitesLastPage()
+    pages = [page(n, "x" * 400) for n in range(1, 11) if n != 4]
+    result = summarize(llm, pages, "f.pdf", page_count=10)
+    assert result["key_points"][0]["page"] == 10
+    assert "10 หน้า" in llm.prompts("document_summary")[0]
