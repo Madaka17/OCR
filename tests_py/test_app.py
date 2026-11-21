@@ -493,13 +493,17 @@ def test_bad_create_body_400(env):
 
 def test_cleanup_removes_expired_jobs(env):
     job = env.store.create("u1", "old.pdf", 10, now=0)
-    start_cleanup(env.store, interval=0.05)
-
-    deadline = time.monotonic() + 10
-    while time.monotonic() < deadline and env.store.get(job["id"]) is not None:
-        time.sleep(0.02)
-
-    assert env.store.get(job["id"]) is None
+    stop = threading.Event()
+    thread = start_cleanup(env.store, interval=0.05, stop=stop)
+    try:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and env.store.get(job["id"]) is not None:
+            time.sleep(0.02)
+        assert env.store.get(job["id"]) is None
+    finally:
+        stop.set()
+        thread.join(5)
+    assert not thread.is_alive()
 
 
 # ----- login limiter (item 1) -------------------------------------------------

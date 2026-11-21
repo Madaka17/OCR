@@ -495,11 +495,15 @@ def make_server(host, port, store, scheduler, auth, events, site_dir=None, summa
     return httpd
 
 
-def start_cleanup(store, events=None, interval=3600):
-    """Every `interval` seconds on a daemon thread: remove expired jobs and prune old log lines."""
+def start_cleanup(store, events=None, interval=3600, stop=None):
+    """Every `interval` seconds on a daemon thread: remove expired jobs and prune old log lines.
+
+    Setting the optional `stop` event ends the loop (tests use it; the server never stops it).
+    """
+    stop = stop or threading.Event()
 
     def loop():
-        while True:
+        while not stop.is_set():
             now = time.time()
             try:
                 store.cleanup(now)
@@ -510,7 +514,7 @@ def start_cleanup(store, events=None, interval=3600):
                     events.prune(now)
                 except Exception as e:  # noqa: BLE001 - pruning must keep running
                     print(f"[cleanup] log prune failed: {e!r}", file=sys.stderr, flush=True)
-            time.sleep(interval)
+            stop.wait(interval)
 
     thread = threading.Thread(target=loop, name="cleanup", daemon=True)
     thread.start()

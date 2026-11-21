@@ -1,4 +1,5 @@
 import json
+import threading
 
 import pytest
 
@@ -158,10 +159,14 @@ def test_start_cleanup_prunes_logs(tmp_path):
     from server.app import start_cleanup
 
     write_jsonl(tmp_path / "events.jsonl", [ev(time_mod.time() - 9 * DAY)])
-    start_cleanup(JobStore(tmp_path), events=EventLog(tmp_path), interval=0.05)
-
-    deadline = time_mod.monotonic() + 10
-    while time_mod.monotonic() < deadline and (tmp_path / "events.jsonl").read_text(encoding="utf-8").strip():
-        time_mod.sleep(0.02)
-
-    assert (tmp_path / "events.jsonl").read_text(encoding="utf-8").strip() == ""
+    stop = threading.Event()
+    thread = start_cleanup(JobStore(tmp_path), events=EventLog(tmp_path), interval=0.05, stop=stop)
+    try:
+        deadline = time_mod.monotonic() + 10
+        while time_mod.monotonic() < deadline and (tmp_path / "events.jsonl").read_text(encoding="utf-8").strip():
+            time_mod.sleep(0.02)
+        assert (tmp_path / "events.jsonl").read_text(encoding="utf-8").strip() == ""
+    finally:
+        stop.set()
+        thread.join(5)
+    assert not thread.is_alive()
