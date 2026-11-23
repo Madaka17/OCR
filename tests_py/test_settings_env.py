@@ -120,3 +120,45 @@ def test_export_prefix_accepted(tmp_path, env_reset):
     importlib.reload(settings)
 
     assert settings.LLM_MODEL == "exported-model"
+
+
+def test_utf16_env_file_warns_and_falls_back(tmp_path, env_reset, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_bytes("OCR_LLM_URL=http://x/v1\n".encode("utf-16"))
+    env_reset.setenv("OCR_ENV_FILE", str(env_file))
+    _clean_llm_env(env_reset)
+
+    importlib.reload(settings)
+
+    err = capsys.readouterr().err
+    assert str(env_file) in err
+    assert "UTF-8" in err
+    assert "http://x" not in err
+    assert settings.LLM_URL == "http://localhost:1235/v1"
+
+
+def test_inline_comment_stripped_from_unquoted_value(tmp_path, env_reset):
+    env_file = tmp_path / ".env"
+    env_file.write_text("OCR_LLM_MODEL=value  # note\n", encoding="utf-8")
+    env_reset.setenv("OCR_ENV_FILE", str(env_file))
+    _clean_llm_env(env_reset)
+
+    importlib.reload(settings)
+
+    assert settings.LLM_MODEL == "value"
+
+
+def test_hash_kept_in_quoted_value_and_without_leading_space(tmp_path, env_reset):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        'OCR_LLM_API_KEY="abc  # kept"\n'
+        "OCR_LLM_MODEL=abc#def\n",
+        encoding="utf-8",
+    )
+    env_reset.setenv("OCR_ENV_FILE", str(env_file))
+    _clean_llm_env(env_reset)
+
+    importlib.reload(settings)
+
+    assert settings.LLM_API_KEY == "abc  # kept"
+    assert settings.LLM_MODEL == "abc#def"

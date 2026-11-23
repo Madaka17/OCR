@@ -25,6 +25,7 @@ _FULL_MONTHS = tuple(_ABBREV_MONTHS.values())
 _FILLERS = ("วันที่", "เดือน", "พ.ศ.", "พ.ศ")
 
 _NUMBER = re.compile(r"\d[\d,./-]*\d|\d")
+_DATE_SEP = re.compile(r"(?<=\d)\s*([/.\-])\s*(?=\d)")
 
 
 def normalize(text: str, *, keep_space: bool = False) -> str:
@@ -44,6 +45,11 @@ def normalize(text: str, *, keep_space: bool = False) -> str:
     return re.sub(r"\s+", "", text)
 
 
+def _join_date_parts(normalized: str) -> str:
+    """Join digit groups split by spaces around "/", "-" or "." (e.g. "27 / 4 / 2569")."""
+    return _DATE_SEP.sub(r"\1", normalized)
+
+
 def _numbers(normalized: str) -> list[str]:
     return [re.sub(r"\.0+$", "", n) for n in _NUMBER.findall(normalized)]
 
@@ -59,7 +65,7 @@ def find_value(value: str, pages: dict[int, str]) -> list[int]:
         pattern = re.compile(before + re.escape(nv) + after)
         return sorted(p for p, text in pages.items() if pattern.search(normalize(text)))
 
-    numbers = _numbers(normalize(value, keep_space=True))
+    numbers = _numbers(_join_date_parts(normalize(value, keep_space=True)))
     if not numbers:
         return []
     patterns = [
@@ -67,7 +73,7 @@ def find_value(value: str, pages: dict[int, str]) -> list[int]:
     ]
     return sorted(
         p for p, text in pages.items()
-        if all(pat.search(normalize(text, keep_space=True)) for pat in patterns)
+        if all(pat.search(_join_date_parts(normalize(text, keep_space=True))) for pat in patterns)
     )
 
 

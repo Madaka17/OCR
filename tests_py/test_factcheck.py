@@ -69,3 +69,11 @@ def test_amount_followed_by_another_number_found():
 
 def test_amount_preceded_by_number_found():
     assert find_value("136,531,093.13", {1: "เดิม 100,085,387.50 136,531,093.13"}) == [1]
+
+
+def test_spaced_numeric_date_not_ok_from_scattered_numbers():
+    assert find_value("27 / 4 / 2569", {1: "หน้า 27 ข้อ 4 ปี 2569"}) == []
+
+
+def test_spaced_numeric_date_found_when_present():
+    assert find_value("27 / 4 / 2569", {1: "ลงวันที่ 27/4/2569"}) == [1]

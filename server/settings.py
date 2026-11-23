@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -22,6 +23,13 @@ def _load_env_file() -> None:
     except OSError as exc:
         print(f"warning: cannot read env file {path}: {exc}", file=sys.stderr)
         return
+    except UnicodeError:
+        print(
+            f"warning: env file {path} is not UTF-8 text; save it as UTF-8 "
+            "and restart. Its settings were ignored.",
+            file=sys.stderr,
+        )
+        return
     for line in text.splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -31,8 +39,10 @@ def _load_env_file() -> None:
         if key.startswith("export ") or key.startswith("export\t"):
             key = key[len("export"):].strip()
         value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
+        if value[:1] in ("\"", "'") and value.find(value[0], 1) > 0:
+            value = value[1:value.find(value[0], 1)]
+        else:
+            value = re.sub(r"\s+#.*$", "", value)
         if key:
             os.environ.setdefault(key, value)
 
