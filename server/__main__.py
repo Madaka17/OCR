@@ -54,8 +54,14 @@ def make_summaries(store):
     if not settings.LLM_URL:
         print("AI summary: off", flush=True)
         return None
-    print(f"AI summary: {settings.LLM_MODEL} at {settings.LLM_URL}", flush=True)
-    llm = LLMClient(settings.LLM_URL, settings.LLM_MODEL)
+    key_note = " (API key set)" if settings.LLM_API_KEY else ""
+    print(f"AI summary: {settings.LLM_MODEL} at {settings.LLM_URL}{key_note}", flush=True)
+    llm = LLMClient(
+        settings.LLM_URL,
+        settings.LLM_MODEL,
+        api_key=settings.LLM_API_KEY,
+        reasoning_effort=settings.LLM_REASONING_EFFORT or None,
+    )
     return SummaryWorker(store, llm, settings.LLM_MODEL, url=settings.LLM_URL)
 
 

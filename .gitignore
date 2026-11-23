@@ -5,6 +5,9 @@ __pycache__/
 **/__pycache__/
 .pytest_cache/
 
+# local settings with secrets (keep .env.example tracked)
+.env
+
 # runtime data: jobs, logs, password config
 data/
 

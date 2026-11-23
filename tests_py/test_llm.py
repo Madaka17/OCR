@@ -17,6 +17,7 @@ class _StubState:
     body = b"{}"
     recorded = []
     paths = []
+    auth = []
 
 
 def _make_handler():
@@ -26,6 +27,7 @@ def _make_handler():
 
         def _reply(self):
             _StubState.paths.append(self.path)
+            _StubState.auth.append(self.headers.get("Authorization"))
             self.send_response(_StubState.status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(_StubState.body)))
@@ -49,6 +51,7 @@ def stub():
     _StubState.body = b"{}"
     _StubState.recorded = []
     _StubState.paths = []
+    _StubState.auth = []
     server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler())
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -80,6 +83,48 @@ def test_complete_sends_body_and_parses_content(stub):
     assert body["temperature"] == 0.2
     assert body["messages"] == [{"role": "user", "content": "hi"}]
     assert state.paths[0] == "/v1/chat/completions"
+
+
+def test_api_key_sent_as_bearer(stub):
+    base, state = stub
+    state.body = _reply_content('{"a":1}')
+
+    LLMClient(base, "m", api_key="k123").complete("hi", SCHEMA, "thing", 50)
+    LLMClient(base, "m", api_key="k123").ping()
+
+    assert state.auth == ["Bearer k123", "Bearer k123"]
+
+
+def test_no_auth_header_without_key(stub):
+    base, state = stub
+    state.body = _reply_content('{"a":1}')
+
+    LLMClient(base, "m").complete("hi", SCHEMA, "thing", 50)
+    LLMClient(base, "m").ping()
+
+    assert state.auth == [None, None]
+
+
+def test_reasoning_effort_omitted_when_none(stub):
+    base, state = stub
+    state.body = _reply_content('{"a":1}')
+
+    LLMClient(base, "m", reasoning_effort=None).complete("hi", SCHEMA, "thing", 50)
+
+    assert "reasoning_effort" not in state.recorded[0]
+
+
+def test_http_error_includes_body_not_key(stub):
+    base, state = stub
+    state.status = 400
+    state.body = b"bad param x"
+
+    with pytest.raises(LLMError) as excinfo:
+        LLMClient(base, "m", api_key="k123").complete("hi", SCHEMA, "thing", 50)
+
+    message = str(excinfo.value)
+    assert "bad param x" in message
+    assert "k123" not in message
 
 
 def test_http_400_raises_llm_error_not_unavailable(stub):

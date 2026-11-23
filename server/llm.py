@@ -20,10 +20,22 @@ class LLMUnavailable(LLMError):
 
 
 class LLMClient:
-    def __init__(self, url: str, model: str, timeout: float = 600):
+    def __init__(
+        self,
+        url: str,
+        model: str,
+        timeout: float = 600,
+        api_key: str = "",
+        reasoning_effort: str | None = "none",
+    ):
         self.url = url.rstrip("/")
         self.model = model
         self.timeout = timeout
+        self.api_key = api_key
+        self.reasoning_effort = reasoning_effort
+
+    def _auth_headers(self) -> dict:
+        return {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
 
     def complete(self, prompt: str, schema: dict, name: str, max_tokens: int) -> dict:
         body = {
@@ -31,12 +43,13 @@ class LLMClient:
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.2,
             "max_tokens": max_tokens,
-            "reasoning_effort": "none",
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {"name": name, "strict": True, "schema": schema},
             },
         }
+        if self.reasoning_effort:
+            body["reasoning_effort"] = self.reasoning_effort
         raw = self._send("/chat/completions", json.dumps(body).encode("utf-8"))
         try:
             payload = json.loads(raw)
@@ -50,7 +63,8 @@ class LLMClient:
 
     def ping(self) -> bool:
         try:
-            with urllib.request.urlopen(f"{self.url}/models", timeout=self.timeout) as resp:
+            request = urllib.request.Request(f"{self.url}/models", headers=self._auth_headers())
+            with urllib.request.urlopen(request, timeout=self.timeout) as resp:
                 return resp.status == 200
         except Exception:
             return False
@@ -68,7 +82,8 @@ class LLMClient:
                 raise LLMUnavailable(f"LLM server unreachable: {exc}") from exc
             conn.sock.settimeout(self.timeout)
             try:
-                conn.request("POST", parts.path, body=data, headers={"Content-Type": "application/json"})
+                headers = {"Content-Type": "application/json", **self._auth_headers()}
+                conn.request("POST", parts.path, body=data, headers=headers)
                 resp = conn.getresponse()
                 raw = resp.read()
             except TimeoutError as exc:
@@ -76,7 +91,8 @@ class LLMClient:
             except (OSError, http.client.HTTPException) as exc:
                 raise LLMUnavailable(f"LLM server unavailable: {exc!r}") from exc
             if resp.status >= 400:
-                raise LLMError(f"HTTP {resp.status} from LLM server")
+                detail = raw[:300].decode("utf-8", errors="replace")
+                raise LLMError(f"HTTP {resp.status} from LLM server: {detail}")
             return raw
         finally:
             conn.close()

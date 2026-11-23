@@ -1,7 +1,10 @@
+import os
 import sys
 from pathlib import Path
 
-import pytest
+os.environ["OCR_ENV_FILE"] = ""  # a developer's real .env must never leak into tests
+
+import pytest  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
