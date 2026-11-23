@@ -91,7 +91,10 @@ class LLMClient:
             except (OSError, http.client.HTTPException) as exc:
                 raise LLMUnavailable(f"LLM server unavailable: {exc!r}") from exc
             if resp.status >= 400:
-                detail = raw[:300].decode("utf-8", errors="replace")
+                text = raw.decode("utf-8", errors="replace")
+                if self.api_key:
+                    text = text.replace(self.api_key, "***")
+                detail = text[:300]
                 raise LLMError(f"HTTP {resp.status} from LLM server: {detail}")
             return raw
         finally:

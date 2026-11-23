@@ -16,7 +16,7 @@ def _load_env_file() -> None:
         return
     path = Path(raw) if raw is not None else BASE_DIR / ".env"
     try:
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")
     except FileNotFoundError:
         return
     except OSError as exc:
@@ -28,6 +28,8 @@ def _load_env_file() -> None:
             continue
         key, _, value = line.partition("=")
         key = key.strip()
+        if key.startswith("export ") or key.startswith("export\t"):
+            key = key[len("export"):].strip()
         value = value.strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]

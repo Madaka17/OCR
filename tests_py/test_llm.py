@@ -202,3 +202,16 @@ def test_read_timeout_raises_llm_error_not_unavailable():
         assert not isinstance(info.value, LLMUnavailable)
     finally:
         listener.close()
+
+
+def test_http_error_body_echoing_key_is_redacted(stub):
+    base, state = stub
+    state.status = 401
+    state.body = b"bad key k123"
+
+    with pytest.raises(LLMError) as excinfo:
+        LLMClient(base, "m", api_key="k123").complete("hi", SCHEMA, "thing", 50)
+
+    message = str(excinfo.value)
+    assert "***" in message
+    assert "k123" not in message

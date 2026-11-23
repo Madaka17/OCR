@@ -98,3 +98,25 @@ def test_unreadable_file_warns_once_and_continues(tmp_path, env_reset, capsys):
     err = capsys.readouterr().err
     assert len(err.strip().splitlines()) == 1
     assert settings.LLM_API_KEY == ""
+
+
+def test_bom_file_first_key_parsed(tmp_path, env_reset):
+    env_file = tmp_path / ".env"
+    env_file.write_bytes(b"\xef\xbb\xbfOCR_LLM_URL=http://x/v1\n")
+    env_reset.setenv("OCR_ENV_FILE", str(env_file))
+    _clean_llm_env(env_reset)
+
+    importlib.reload(settings)
+
+    assert settings.LLM_URL == "http://x/v1"
+
+
+def test_export_prefix_accepted(tmp_path, env_reset):
+    env_file = tmp_path / ".env"
+    env_file.write_text("export OCR_LLM_MODEL=exported-model\n", encoding="utf-8")
+    env_reset.setenv("OCR_ENV_FILE", str(env_file))
+    _clean_llm_env(env_reset)
+
+    importlib.reload(settings)
+
+    assert settings.LLM_MODEL == "exported-model"
