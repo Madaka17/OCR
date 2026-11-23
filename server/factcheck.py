@@ -27,13 +27,20 @@ _FILLERS = ("วันที่", "เดือน", "พ.ศ.", "พ.ศ")
 _NUMBER = re.compile(r"\d[\d,./-]*\d|\d")
 
 
-def normalize(text: str) -> str:
-    """Convert Thai digits, expand abbreviated months and drop filler words and whitespace."""
+def normalize(text: str, *, keep_space: bool = False) -> str:
+    """Convert Thai digits, expand abbreviated months and drop filler words.
+
+    Whitespace is removed, so dates match across spacing differences. With
+    keep_space, runs of whitespace become one space instead, so adjacent amounts
+    stay separate tokens.
+    """
     text = text.translate(_THAI_DIGITS)
     for short, full in _ABBREV_MONTHS.items():
         text = text.replace(short, full)
     for filler in _FILLERS:
         text = text.replace(filler, "")
+    if keep_space:
+        return re.sub(r"\s+", " ", text).strip()
     return re.sub(r"\s+", "", text)
 
 
@@ -52,7 +59,7 @@ def find_value(value: str, pages: dict[int, str]) -> list[int]:
         pattern = re.compile(before + re.escape(nv) + after)
         return sorted(p for p, text in pages.items() if pattern.search(normalize(text)))
 
-    numbers = _numbers(nv)
+    numbers = _numbers(normalize(value, keep_space=True))
     if not numbers:
         return []
     patterns = [
@@ -60,7 +67,7 @@ def find_value(value: str, pages: dict[int, str]) -> list[int]:
     ]
     return sorted(
         p for p, text in pages.items()
-        if all(pat.search(normalize(text)) for pat in patterns)
+        if all(pat.search(normalize(text, keep_space=True)) for pat in patterns)
     )
 
 

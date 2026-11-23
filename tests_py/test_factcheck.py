@@ -61,3 +61,11 @@ def test_whole_amount_not_matched_against_decimal_amount():
 
 def test_amount_before_sentence_full_stop_still_found():
     assert find_value("34,358,800", {33: "อาคาร 34,358,800."}) == [33]
+
+
+def test_amount_followed_by_another_number_found():
+    assert find_value("100,085,387.50 บาท", {1: "รวมราคา 100,085,387.50 136,531,093,13"}) == [1]
+
+
+def test_amount_preceded_by_number_found():
+    assert find_value("136,531,093.13", {1: "เดิม 100,085,387.50 136,531,093.13"}) == [1]
