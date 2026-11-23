@@ -25,7 +25,7 @@ _FULL_MONTHS = tuple(_ABBREV_MONTHS.values())
 _FILLERS = ("วันที่", "เดือน", "พ.ศ.", "พ.ศ")
 
 _NUMBER = re.compile(r"\d[\d,./-]*\d|\d")
-_DATE_SEP = re.compile(r"(?<=\d)\s*([/.\-])\s*(?=\d)")
+_DATE_SEP = re.compile(r"(?<=\d)\s*([/\-])\s*(?=\d)")
 
 
 def normalize(text: str, *, keep_space: bool = False) -> str:
@@ -46,7 +46,8 @@ def normalize(text: str, *, keep_space: bool = False) -> str:
 
 
 def _join_date_parts(normalized: str) -> str:
-    """Join digit groups split by spaces around "/", "-" or "." (e.g. "27 / 4 / 2569")."""
+    """Join digit groups split by spaces around "/" or "-" (e.g. "27 / 4 / 2569"). A period is left alone: it is
+    usually a list marker or full stop between amounts."""
     return _DATE_SEP.sub(r"\1", normalized)
 
 

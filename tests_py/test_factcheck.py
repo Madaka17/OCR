@@ -77,3 +77,19 @@ def test_spaced_numeric_date_not_ok_from_scattered_numbers():
 
 def test_spaced_numeric_date_found_when_present():
     assert find_value("27 / 4 / 2569", {1: "ลงวันที่ 27/4/2569"}) == [1]
+
+
+def test_period_list_marker_before_amount_found():
+    assert find_value("12,000", {1: "รายการที่ 5. 12,000 บาท"}) == [1]
+
+
+def test_period_between_amounts_keeps_second_amount():
+    assert find_value("2,250", {1: "ราคา 1,600. 2,250 บาท"}) == [1]
+
+
+def test_period_between_amounts_keeps_first_amount():
+    assert find_value("1,600", {1: "ราคา 1,600. 2,250 บาท"}) == [1]
+
+
+def test_period_list_marker_before_plain_number_found():
+    assert find_value("100", {1: "ข้อ 1. 100 บาท"}) == [1]
