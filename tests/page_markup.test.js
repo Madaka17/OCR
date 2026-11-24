@@ -245,3 +245,49 @@ test("index.html: inline script has no browser OCR worker", () => {
   assert.doesNotMatch(script, /new Worker\(/, "no in-browser worker");
   assert.doesNotMatch(script, /startWorker/, "no startWorker");
 });
+
+// ---- model select in the bottom bar (AI summary model) ----
+
+test("index.html: model select sits in the composer, hidden until models load", () => {
+  const html = read("index.html");
+  assert.equal((html.match(/id="model-select"/g) || []).length, 1, "model-select appears once");
+  const composer = block(html, null, '<footer class="composer">', "</footer>");
+  assert.match(composer, /<select id="model-select" class="model-select" hidden><\/select>/, "hidden select in the composer");
+  assert.match(composer, /<label for="model-select" class="sr-only">โมเดลสรุป AI<\/label>/, "sr-only label");
+  const label = composer.indexOf('for="model-select"');
+  const hint = composer.indexOf("composer-hint");
+  const add = composer.indexOf("เพิ่มไฟล์");
+  assert.ok(label > hint && label < add, "label sits after the hint and before เพิ่มไฟล์");
+});
+
+test("index.html: inline script loads models and remembers the choice", () => {
+  const html = read("index.html");
+  const script = html.slice(html.lastIndexOf("<script>"));
+  assert.match(script, /api\("GET", "\/api\/models"\)/, "loads the model list");
+  assert.match(script, /"ocr-model"/, "remembers the choice under ocr-model");
+});
+
+test("index.html: upload body sends the chosen model only when the select shows", () => {
+  const html = read("index.html");
+  const script = html.slice(html.lastIndexOf("<script>"));
+  assert.match(script, /api\("POST", "\/api\/jobs", body\)/, "create call sends the body");
+  assert.match(script, /if \(!modelSelect\.hidden\) body\.model = modelSelect\.value;/, "model added only when the select is shown");
+});
+
+test("index.html: mobile composer gives the model select a full row share", () => {
+  const html = read("index.html");
+  const start = html.indexOf("@media (max-width: 768px)");
+  const media = html.slice(start, html.indexOf("@media (prefers-reduced-motion: reduce)", start));
+  assert.match(media, /\.composer-bar \.model-select \{[^}]*flex: 1 1 0/, "mobile flex rule");
+  assert.match(media, /\.composer-bar \.model-select \{[^}]*min-height: 44px/, "mobile touch height");
+});
+
+test("index.html: model-select rules use theme tokens only", () => {
+  const html = read("index.html");
+  const rules = [...html.matchAll(/[^{}]*\.(?:composer-bar )?\.?model-select[^{]*\{[^}]*\}/g)].map((m) => m[0]);
+  assert.ok(rules.length >= 2, "model-select rules exist");
+  for (const rule of rules) {
+    assert.doesNotMatch(rule, /#[0-9a-fA-F]{3,8}\b/, "no hex colour");
+    assert.doesNotMatch(rule, /rgba?\(/, "no rgb colour");
+  }
+});
