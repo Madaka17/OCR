@@ -919,7 +919,7 @@ def test_models_lists_catalog_with_default(env_models):
 
     assert r.status == 200
     assert r.json() == {
-        "models": [{"id": "model-a", "name": "model-a"}, {"id": "model-b", "name": "model-b"}],
+        "models": [{"id": "model-a", "name": "model-a", "key": "1"}, {"id": "model-b", "name": "model-b", "key": "1"}],
         "default": "model-a",
     }
 
@@ -979,3 +979,73 @@ def test_job_creation_with_api_down_allows_only_the_default(env_models_down):
     assert ok.status == 201
     assert other.status == 400
     assert other.json() == {"error": MODEL_INVALID_MSG}
+
+
+class KeyedModelsLLM:
+    """Lists `ids` for the key it stands for."""
+
+    def __init__(self, ids):
+        self.ids = ids
+
+    def list_models(self):
+        return list(self.ids)
+
+
+@pytest.fixture
+def env_two_keys(tmp_path):
+    catalog = ModelCatalog(KeyedModelsLLM(["model-a", "model-b"]), "model-a",
+                           others={"2": KeyedModelsLLM(["model-c"])})
+    yield from serve_env(tmp_path, llm=False, models=catalog)
+
+
+def test_create_job_with_key_two_and_its_model_stores_key(env_two_keys):
+    user = logged_in(env_two_keys)
+
+    r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-c", "key": "2"})
+
+    assert r.status == 201
+    job_id = r.json()["job"]["id"]
+    assert env_two_keys.store.get(job_id)["llm_key"] == "2"
+    assert env_two_keys.store.get(job_id)["model"] == "model-c"
+
+
+def test_create_job_with_key_two_default_is_allowed(env_two_keys):
+    r = logged_in(env_two_keys).request("POST", "/api/jobs",
+                                        {"filename": "a.pdf", "size": 10, "model": "model-a", "key": "2"})
+
+    assert r.status == 201
+
+
+@pytest.mark.parametrize("body", [
+    {"model": "model-c", "key": "3"},
+    {"model": "model-c", "key": 2},
+    {"key": "2"},
+    {"model": None, "key": "2"},
+    {"model": "model-b", "key": "2"},
+])
+def test_create_job_with_bad_key_or_pair_is_400(env_two_keys, body):
+    user = logged_in(env_two_keys)
+
+    r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, **body})
+
+    assert r.status == 400
+    assert r.json() == {"error": MODEL_INVALID_MSG}
+    assert env_two_keys.store.list(None) == []
+
+
+def test_create_job_with_key_one_or_null_has_no_llm_key(env_two_keys):
+    user = logged_in(env_two_keys)
+
+    one = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-a", "key": "1"})
+    nul = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-a", "key": None})
+
+    assert one.status == 201 and nul.status == 201
+    assert "llm_key" not in env_two_keys.store.get(one.json()["job"]["id"])
+    assert "llm_key" not in env_two_keys.store.get(nul.json()["job"]["id"])
+
+
+def test_create_job_without_key_has_no_llm_key(env_two_keys):
+    r = logged_in(env_two_keys).request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-a"})
+
+    assert r.status == 201
+    assert "llm_key" not in env_two_keys.store.get(r.json()["job"]["id"])

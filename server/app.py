@@ -365,15 +365,24 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"models": [], "default": None})
         return self._json(200, {"models": models.list(), "default": models.default})
 
-    def _model_from(self, body: dict) -> str | None:
-        """The model a job asked for, or None. Anything the catalog does not allow is a 400."""
+    def _model_from(self, body: dict) -> tuple[str | None, str | None]:
+        """The (model, key) a job asked for, or (None, None). Anything the catalog does not allow is a 400.
+
+        A key is only accepted together with a model, and defaults to "1".
+        """
         model = body.get("model")
+        key = body.get("key")
         if model is None:
-            return None
+            if key is not None:
+                raise JobError(400, MSG_MODEL_INVALID)
+            return None, None
         models = self.server.models
-        if models is None or not isinstance(model, str) or not model or not models.allowed(model):
+        if key is None:
+            key = "1"
+        if (models is None or not isinstance(model, str) or not model
+                or not isinstance(key, str) or not models.allowed(model, key)):
             raise JobError(400, MSG_MODEL_INVALID)
-        return model
+        return model, key
 
     def _create_job(self, session):
         body = self._read_json()
@@ -381,11 +390,12 @@ class Handler(BaseHTTPRequestHandler):
         size = body.get("size")
         if not isinstance(filename, str) or not isinstance(size, int) or isinstance(size, bool):
             raise JobError(400, MSG_BAD_REQUEST)
-        model = self._model_from(body)
+        model, llm_key = self._model_from(body)
         free = shutil.disk_usage(_existing_ancestor(self.server.store.root)).free
         if free < size * 2 + DISK_HEADROOM_BYTES:
             raise JobError(507, MSG_DISK_FULL)
-        meta = self.server.store.create(session["owner"], filename, size, now=time.time(), model=model)
+        meta = self.server.store.create(session["owner"], filename, size, now=time.time(), model=model,
+                                                 llm_key=llm_key)
         return self._json(201, {"job": self._public(meta, session), "chunk_size": settings.CHUNK_BYTES})
 
     def _get_job(self, session, job_id):

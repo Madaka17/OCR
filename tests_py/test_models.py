@@ -52,8 +52,8 @@ def test_default_is_added_when_api_omits_it():
     catalog = ModelCatalog(llm, "unsloth/qwen3.5-4b")
 
     assert catalog.list() == [
-        {"id": "unsloth/qwen3.5-4b", "name": "qwen3.5-4b"},
-        {"id": "x", "name": "x"},
+        {"id": "unsloth/qwen3.5-4b", "name": "qwen3.5-4b", "key": "1"},
+        {"id": "x", "name": "x", "key": "1"},
     ]
 
 
@@ -87,7 +87,7 @@ def test_api_error_without_good_fetch_returns_only_default():
     llm = FakeModelsLLM(error=LLMUnavailable("down"))
     catalog = ModelCatalog(llm, "unsloth/qwen3.5-4b")
 
-    assert catalog.list() == [{"id": "unsloth/qwen3.5-4b", "name": "qwen3.5-4b"}]
+    assert catalog.list() == [{"id": "unsloth/qwen3.5-4b", "name": "qwen3.5-4b", "key": "1"}]
 
 
 def test_failed_refresh_is_retried_after_a_minute():
@@ -113,7 +113,7 @@ def test_unexpected_error_falls_back_like_api_error():
         def list_models(self):
             raise RuntimeError("bug")
 
-    assert ModelCatalog(Broken(), "d").list() == [{"id": "d", "name": "d"}]
+    assert ModelCatalog(Broken(), "d").list() == [{"id": "d", "name": "d", "key": "1"}]
 
 
 def test_allowed_only_for_listed_ids():
@@ -126,3 +126,57 @@ def test_allowed_only_for_listed_ids():
 
 def test_default_property():
     assert ModelCatalog(FakeModelsLLM(), "d").default == "d"
+
+
+def test_one_key_names_have_no_suffix():
+    catalog = ModelCatalog(FakeModelsLLM(ids=["x"]), "d")
+
+    assert catalog.list() == [{"id": "d", "name": "d", "key": "1"}, {"id": "x", "name": "x", "key": "1"}]
+
+
+def test_two_keys_order_and_names():
+    catalog = ModelCatalog(FakeModelsLLM(ids=["x"]), "d",
+                           others={"2": FakeModelsLLM(ids=["y", "d"])})
+
+    assert catalog.list() == [
+        {"id": "d", "name": "d · key 1", "key": "1"},
+        {"id": "x", "name": "x · key 1", "key": "1"},
+        {"id": "d", "name": "d · key 2", "key": "2"},
+        {"id": "y", "name": "y · key 2", "key": "2"},
+    ]
+
+
+def test_allowed_is_per_key():
+    catalog = ModelCatalog(FakeModelsLLM(ids=["x"]), "d", others={"2": FakeModelsLLM(ids=["y"])})
+
+    assert catalog.allowed("y", "2") is True
+    assert catalog.allowed("d", "2") is True
+    assert catalog.allowed("x", "2") is False
+    assert catalog.allowed("y") is False
+    assert catalog.allowed("x") is True
+
+
+def test_unknown_key_is_not_allowed():
+    catalog = ModelCatalog(FakeModelsLLM(ids=["x"]), "d", others={"2": FakeModelsLLM(ids=["y"])})
+
+    assert catalog.allowed("d", "3") is False
+
+
+def test_key_two_down_offers_only_its_default():
+    catalog = ModelCatalog(FakeModelsLLM(ids=["x"]), "d",
+                           others={"2": FakeModelsLLM(error=LLMUnavailable("down"))})
+
+    assert [(m["id"], m["key"]) for m in catalog.list()] == [("d", "1"), ("x", "1"), ("d", "2")]
+    assert catalog.allowed("d", "2") is True
+    assert catalog.allowed("y", "2") is False
+
+
+def test_each_key_has_its_own_cache():
+    clock = {"t": 1000.0}
+    k1 = FakeModelsLLM(ids=["x"])
+    k2 = FakeModelsLLM(ids=["y"])
+    catalog = ModelCatalog(k1, "d", ttl=600, now=lambda: clock["t"], others={"2": k2})
+
+    catalog.list()
+    catalog.list()
+    assert (k1.calls, k2.calls) == (1, 1)

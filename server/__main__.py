@@ -57,13 +57,21 @@ def make_summaries(store):
         return None
     key_note = " (API key set)" if settings.LLM_API_KEY else ""
     print(f"AI summary: {settings.LLM_MODEL} at {settings.LLM_URL}{key_note}", flush=True)
-    llm = LLMClient(
-        settings.LLM_URL,
-        settings.LLM_MODEL,
-        api_key=settings.LLM_API_KEY,
-        reasoning_effort=settings.LLM_REASONING_EFFORT or None,
-    )
-    return SummaryWorker(store, llm, settings.LLM_MODEL, url=settings.LLM_URL)
+
+    def client(api_key: str) -> LLMClient:
+        return LLMClient(
+            settings.LLM_URL,
+            settings.LLM_MODEL,
+            api_key=api_key,
+            reasoning_effort=settings.LLM_REASONING_EFFORT or None,
+        )
+
+    llm = client(settings.LLM_API_KEY)
+    llms = {"1": llm}
+    if settings.LLM_API_KEY_2:
+        llms["2"] = client(settings.LLM_API_KEY_2)
+        print("AI summary: second API key set", flush=True)
+    return SummaryWorker(store, llm, settings.LLM_MODEL, url=settings.LLM_URL, llms=llms)
 
 
 def serve() -> int:
@@ -81,7 +89,10 @@ def serve() -> int:
     scheduler.start()
     start_cleanup(store, events=events)
     summaries = make_summaries(store)
-    models = ModelCatalog(summaries.llm, settings.LLM_MODEL) if summaries is not None else None
+    models = None
+    if summaries is not None:
+        others = {name: c for name, c in summaries.llms.items() if name != "1"}
+        models = ModelCatalog(summaries.llm, settings.LLM_MODEL, others=others or None)
     httpd = make_server(settings.HOST, settings.PORT, store, scheduler, auth, events,
                         summaries=summaries, models=models)
     host, port = httpd.server_address[:2]

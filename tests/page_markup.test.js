@@ -271,7 +271,7 @@ test("index.html: upload body sends the chosen model only when the select shows"
   const html = read("index.html");
   const script = html.slice(html.lastIndexOf("<script>"));
   assert.match(script, /api\("POST", "\/api\/jobs", body\)/, "create call sends the body");
-  assert.match(script, /if \(!modelSelect\.hidden\) body\.model = modelSelect\.value;/, "model added only when the select is shown");
+  assert.match(script, /if \(!modelSelect\.hidden\) \{/, "model added only when the select is shown");
 });
 
 test("index.html: mobile composer gives the model select a full row share", () => {
@@ -290,4 +290,15 @@ test("index.html: model-select rules use theme tokens only", () => {
     assert.doesNotMatch(rule, /#[0-9a-fA-F]{3,8}\b/, "no hex colour");
     assert.doesNotMatch(rule, /rgba?\(/, "no rgb colour");
   }
+});
+
+test("index.html: model options carry key|id values and the key is sent only when it is not 1", () => {
+  const html = read("index.html");
+  const script = html.slice(html.lastIndexOf("<script>"));
+  assert.match(script, /opt\.value = m\.key \+ "\|" \+ m\.id;/, "option value is key|id");
+  assert.match(script, /opt\.title = m\.id;/, "title is the model id");
+  assert.match(script, /"1\|" \+ data\.default/, "old default is key 1");
+  assert.match(script, /saved\.indexOf\("\|"\) < 0/, "saved value without | is treated as key 1");
+  assert.match(script, /body\.model = modelSelect\.value\.slice\(sep \+ 1\);/, "model id is sent in the body");
+  assert.match(script, /if \(key !== "1"\) body\.key = key;/, "key sent only when it is not 1");
 });

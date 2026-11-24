@@ -27,9 +27,11 @@ def _clip(error: BaseException) -> str:
 class SummaryWorker:
     """Summarizes one OCR-done job at a time. Writes go through store.write_summary."""
 
-    def __init__(self, store, llm, model: str, now=time.time, poll_seconds: float = POLL_SECONDS, url: str = ""):
+    def __init__(self, store, llm, model: str, now=time.time, poll_seconds: float = POLL_SECONDS, url: str = "",
+                 llms: dict | None = None):
         self.store = store
         self.llm = llm
+        self.llms = dict(llms or {})  # API key name -> client; a job picks one by its llm_key
         self.model = model
         self.url = url
         self._now = now
@@ -86,12 +88,25 @@ class SummaryWorker:
         """The model this job is summarized with: its own choice, else the server default."""
         return meta.get("model") or self.model
 
-    def _llm_for(self, model: str):
-        return self.llm if model == self.model else self.llm.with_model(model)
+    def _client_for(self, meta: dict):
+        """The client for the job's API key; the default client when that key is not configured."""
+        client = self.llms.get(meta.get("llm_key", "1"))
+        return client if client is not None else self.llm
+
+    def _llm_for(self, model: str, base):
+        return base if model == self.model else base.with_model(model)
 
     def _put(self, job_id: str, now: float, prev: dict, model: str, **changes) -> dict | None:
-        """Write a full record built from prev. Returns it, or None when the job is gone."""
+        """Write a full record built from prev. Returns it, or None when the job is gone.
+
+        The record names the API key only when it is not the default key "1".
+        """
         record = {**DEFAULTS, **prev, **changes, "model": model, "updated_at": now}
+        meta = self.store.get(job_id) or {}
+        if meta.get("llm_key", "1") != "1":
+            record["llm_key"] = meta["llm_key"]
+        else:
+            record.pop("llm_key", None)
         return record if self.store.write_summary(job_id, record) else None
 
     # ----- queue -----------------------------------------------------------
@@ -174,7 +189,7 @@ class SummaryWorker:
 
     def _summarize_and_store(self, job_id: str, meta: dict, prev: dict, clock) -> None:
         model = self._job_model(meta)
-        llm = self._llm_for(model)
+        llm = self._llm_for(model, self._client_for(meta))
         pages = []
         for number in range(1, meta["pages"] + 1):
             page = self.store.read_page(job_id, number)

@@ -1896,17 +1896,20 @@
     modelSelect.textContent = "";
     models.forEach(function (m) {
       var opt = document.createElement("option");
-      opt.value = m.id;
+      opt.value = m.key + "|" + m.id;
       opt.textContent = m.name;
       opt.title = m.id;
       modelSelect.appendChild(opt);
     });
-    var ids = models.map(function (m) { return m.id; });
+    // Option values are "key|id". A saved value from before keys existed has no "|" and is key "1".
+    var values = models.map(function (m) { return m.key + "|" + m.id; });
+    var defaultValue = "1|" + data.default;
     var saved = null;
     try { saved = localStorage.getItem("ocr-model"); } catch (err) {}
-    if (ids.indexOf(saved) >= 0) modelSelect.value = saved;
-    else if (ids.indexOf(data.default) >= 0) modelSelect.value = data.default;
-    else modelSelect.value = ids[0];
+    if (saved && saved.indexOf("|") < 0) saved = "1|" + saved;
+    if (values.indexOf(saved) >= 0) modelSelect.value = saved;
+    else if (values.indexOf(defaultValue) >= 0) modelSelect.value = defaultValue;
+    else modelSelect.value = values[0];
     modelSelect.hidden = false;
     modelSelect.addEventListener("change", function () {
       try { localStorage.setItem("ocr-model", modelSelect.value); } catch (err) {}
@@ -1916,7 +1919,12 @@
   async function submitToServer(file, name) {
     statusText.textContent = "กำลังเริ่มอัปโหลด " + name + " …";
     var body = { filename: name, size: file.size };
-    if (!modelSelect.hidden) body.model = modelSelect.value;
+    if (!modelSelect.hidden) {
+      var sep = modelSelect.value.indexOf("|");
+      var key = modelSelect.value.slice(0, sep);
+      body.model = modelSelect.value.slice(sep + 1);
+      if (key !== "1") body.key = key;
+    }
     var created = await api("POST", "/api/jobs", body);
     var jobId = created.job.id;
     var ranges = JobsClient.chunkRanges(file.size, created.chunk_size);
