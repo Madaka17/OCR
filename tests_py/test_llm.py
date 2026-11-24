@@ -215,3 +215,74 @@ def test_http_error_body_echoing_key_is_redacted(stub):
     message = str(excinfo.value)
     assert "***" in message
     assert "k123" not in message
+
+
+def test_list_models_parses_ids_dedups_and_sends_auth(stub):
+    base, state = stub
+    state.body = json.dumps({"data": [{"id": "a"}, {"id": "b"}, {"id": "a"}]}).encode()
+
+    assert LLMClient(base, "m", api_key="k123").list_models() == ["a", "b"]
+    assert state.paths[0] == "/v1/models"
+    assert state.auth == ["Bearer k123"]
+
+
+def test_list_models_keeps_only_active_chat_models(stub):
+    base, state = stub
+    state.body = json.dumps({"data": [
+        {"id": "deepseek/chat", "status": "active", "supported_endpoints": ["chat.completions", "responses"]},
+        {"id": "paxa/paxa-ocr-lite-v1", "status": "active", "supported_endpoints": ["ocr"]},
+        {"id": "paxa/paxa-tts", "status": "active", "supported_endpoints": ["audio.speech"]},
+        {"id": "qwen/chat", "status": "active", "supported_endpoints": ["chat.completions"]},
+        {"id": "bare"},
+    ]}).encode()
+
+    assert LLMClient(base, "m").list_models() == ["deepseek/chat", "qwen/chat", "bare"]
+
+
+def test_list_models_skips_inactive_entries(stub):
+    base, state = stub
+    state.body = json.dumps({"data": [
+        {"id": "old", "status": "retired", "supported_endpoints": ["chat.completions"]},
+        {"id": "new", "status": "active", "supported_endpoints": ["chat.completions"]},
+    ]}).encode()
+
+    assert LLMClient(base, "m").list_models() == ["new"]
+
+
+def test_list_models_error_body_redacts_key(stub):
+    base, state = stub
+    state.status = 500
+    state.body = b"oops k123"
+
+    with pytest.raises(LLMError) as excinfo:
+        LLMClient(base, "m", api_key="k123").list_models()
+
+    assert "oops" in str(excinfo.value)
+    assert "k123" not in str(excinfo.value)
+
+
+def test_list_models_without_data_raises_llm_error(stub):
+    base, state = stub
+    state.body = b'{"models": []}'
+
+    with pytest.raises(LLMError):
+        LLMClient(base, "m").list_models()
+
+
+def test_list_models_connection_refused_raises_unavailable():
+    with pytest.raises(LLMUnavailable):
+        LLMClient("http://127.0.0.1:9/v1", "m", timeout=2).list_models()
+
+
+def test_with_model_keeps_url_key_and_settings():
+    client = LLMClient("http://h/v1/", "m", timeout=7, api_key="k", reasoning_effort="low")
+
+    other = client.with_model("x")
+
+    assert other is not client
+    assert other.model == "x"
+    assert other.url == client.url == "http://h/v1"
+    assert other.timeout == 7
+    assert other.api_key == "k"
+    assert other.reasoning_effort == "low"
+    assert client.model == "m"

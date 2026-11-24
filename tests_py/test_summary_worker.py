@@ -36,8 +36,8 @@ class FakeLLM:
         return canned(name)
 
 
-def make_done_job(store, pages_text, finished_at):
-    job = store.create("u1", "doc.pdf", 10, now=0)
+def make_done_job(store, pages_text, finished_at, model=None, llm_key=None):
+    job = store.create("u1", "doc.pdf", 10, now=0, model=model, llm_key=llm_key)
     job_id = job["id"]
     store.set_state(job_id, "done", pages=len(pages_text), finished_at=finished_at)
     for i, t in enumerate(pages_text, 1):
@@ -46,13 +46,30 @@ def make_done_job(store, pages_text, finished_at):
     return job_id
 
 
+class ModelFakeLLM:
+    """Like FakeLLM, but records the model of every call and every with_model request."""
+
+    def __init__(self, model="test-model", log=None):
+        self.model = model
+        self.log = log if log is not None else []
+        self.with_model_calls = []
+
+    def with_model(self, model):
+        self.with_model_calls.append(model)
+        return ModelFakeLLM(model, log=self.log)
+
+    def complete(self, prompt, schema, name, max_tokens):
+        self.log.append(self.model)
+        return canned(name)
+
+
 @pytest.fixture
 def make_worker(store):
     created = []
 
-    def factory(llm=None, poll_seconds=5, now=time.time):
+    def factory(llm=None, poll_seconds=5, now=time.time, llms=None):
         worker = SummaryWorker(store, llm or FakeLLM(), model="test-model", now=now,
-                               poll_seconds=poll_seconds, url="http://llm.test")
+                               poll_seconds=poll_seconds, url="http://llm.test", llms=llms)
         created.append(worker)
         return worker
 
@@ -331,3 +348,79 @@ def test_summarize_gets_real_page_count(store, make_worker, monkeypatch):
     monkeypatch.setattr(sw.summarizer, "summarize", fake_summarize)
     make_worker().step(now=10.0)
     assert got["count"] == 3
+
+
+def test_job_model_is_used_and_recorded_on_every_record(store, make_worker):
+    llm = ModelFakeLLM()
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0, model="other")
+    worker = make_worker(llm)
+
+    worker.step(now=10.0)
+
+    assert llm.with_model_calls == ["other"]
+    assert set(llm.log) == {"other"}
+    record = store.read_summary(job_id)
+    assert record["state"] == "done"
+    assert record["model"] == "other"
+    assert worker.status()["model"] == "test-model"
+
+
+def test_job_without_model_uses_default_and_does_not_clone(store, make_worker):
+    llm = ModelFakeLLM()
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    worker = make_worker(llm)
+
+    worker.step(now=10.0)
+
+    assert llm.with_model_calls == []
+    assert set(llm.log) == {"test-model"}
+    assert store.read_summary(job_id)["model"] == "test-model"
+
+
+def test_job_with_key_two_is_summarized_by_client_two(store, make_worker):
+    first = ModelFakeLLM()
+    second = ModelFakeLLM(model="test-model")
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0, llm_key="2")
+    worker = make_worker(first, llms={"1": first, "2": second})
+
+    worker.step(now=10.0)
+
+    assert set(second.log) == {"test-model"}
+    assert first.log == []
+    record = store.read_summary(job_id)
+    assert record["state"] == "done"
+    assert record["llm_key"] == "2"
+
+
+def test_key_two_job_with_model_uses_model_on_client_two(store, make_worker):
+    first = ModelFakeLLM()
+    second = ModelFakeLLM(model="test-model")
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0, model="other", llm_key="2")
+    worker = make_worker(first, llms={"1": first, "2": second})
+
+    worker.step(now=10.0)
+
+    assert second.with_model_calls == ["other"]
+    assert first.log == []
+    assert store.read_summary(job_id)["model"] == "other"
+
+
+def test_job_with_unconfigured_key_falls_back_to_default_client(store, make_worker):
+    llm = ModelFakeLLM()
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0, llm_key="2")
+    worker = make_worker(llm, llms={"1": llm})
+
+    worker.step(now=10.0)
+
+    assert set(llm.log) == {"test-model"}
+    assert store.read_summary(job_id)["state"] == "done"
+
+
+def test_key_one_record_has_no_llm_key(store, make_worker):
+    llm = ModelFakeLLM()
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0, llm_key="1")
+    worker = make_worker(llm)
+
+    worker.step(now=10.0)
+
+    assert "llm_key" not in store.read_summary(job_id)
