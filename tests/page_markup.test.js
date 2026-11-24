@@ -181,3 +181,43 @@ test("index.html: start cards and bar wire to the existing handlers", () => {
   assert.match(html, /body:not\(\.result-open\) \.new-job-btn \{ display: none; \}/, "new-job button hidden without a result");
   assert.match(html, /\.composer-bar\.drag \{[^}]*outline: 2px dashed var\(--primary\)/, "drag state uses --primary dashed outline");
 });
+
+// ---- fix round 1: pinned composer, mobile wrap, limits, ram warning, busy guard ----
+
+test("index.html: main is a flex column so the composer pins to the bottom", () => {
+  const html = read("index.html");
+  const main = html.match(/\n {2}\.main \{[^}]*\}/);
+  assert.ok(main, ".main rule exists");
+  assert.match(main[0], /display: flex/, ".main is a flex container");
+  assert.match(main[0], /flex-direction: column/, ".main stacks content above the composer");
+  assert.match(main[0], /min-height: 100vh/, ".main fills the viewport");
+  assert.match(html, /\.content \{[^}]*flex: 1/, ".content grows so the composer sits at the bottom");
+});
+
+test("index.html: composer wraps on mobile, hint takes its own row, select fills the rest", () => {
+  const html = read("index.html");
+  const start = html.indexOf("@media (max-width: 768px)");
+  const media = html.slice(start, html.indexOf("@media (prefers-reduced-motion: reduce)", start));
+  assert.match(media, /\.composer-bar \{[^}]*flex-wrap: wrap/, "bar wraps");
+  assert.match(media, /\.composer-hint \{[^}]*flex: 1 1 100%/, "hint takes a full row");
+  assert.match(media, /\.composer-bar \.mode-select \{[^}]*flex: 1 1 0/, "select takes the remaining width");
+});
+
+test("index.html: ram warning sits above the bottom bar, once", () => {
+  const html = read("index.html");
+  assert.equal((html.match(/id="ram-warning"/g) || []).length, 1, "ram-warning appears once");
+  const composer = block(html, null, '<footer class="composer">', "</footer>");
+  assert.match(composer, /<p id="ram-warning" class="notice" role="status" hidden><\/p>/, "in the composer");
+  assert.ok(composer.indexOf('id="ram-warning"') < composer.indexOf('id="dropzone"'), "above the bar");
+});
+
+test("index.html: upload limits line under the hero sub", () => {
+  const html = read("index.html");
+  assert.match(html, /<p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF<\/p>\s*<p class="empty-sub">สูงสุด 30 หน้า · ไฟล์ละไม่เกิน 50 MB<\/p>/, "limits line");
+});
+
+test("index.html: start cards do nothing while busy", () => {
+  const html = read("index.html");
+  const script = html.slice(html.lastIndexOf("<script>"));
+  assert.match(script, /addEventListener\("click", function \(\) \{\s*if \(busy\) return;\s*if \(card\.dataset\.action === "jobs"\)/, "busy guard first");
+});

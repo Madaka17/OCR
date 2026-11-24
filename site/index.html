@@ -180,7 +180,7 @@
     min-width: 0;
   }
   .sidebar > .brand { padding: 4px 6px 14px; }
-  .main { min-width: 0; }
+  .main { min-width: 0; display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
   /* sidebar navigation */
   .nav { display: grid; gap: 4px; }
   .nav-item {
@@ -274,6 +274,7 @@
   }
   .composer-bar.drag { outline: 2px dashed var(--primary); outline-offset: 3px; }
   .composer-bar.busy { opacity: 0.6; cursor: progress; pointer-events: none; }
+  .composer > .notice { max-width: 760px; margin: 0 auto 8px; }
   .composer-hint { flex: 1 1 0; min-width: 0; color: var(--muted); font-size: 0.9rem; overflow-wrap: anywhere; }
   .composer-bar .mode-select { max-width: 150px; min-height: 40px; }
   .composer-add { flex: none; white-space: nowrap; }
@@ -744,7 +745,7 @@
   .btn-link { text-decoration: none; display: inline-block; }
   @media (prefers-reduced-motion: reduce) { .job-fill { transition: none; } }
 
-  .content { min-width: 0; padding: 24px 24px 32px; }
+  .content { min-width: 0; flex: 1; padding: 24px 24px 32px; }
 
   /* ---- responsive ---- */
   /* Drawer: the sidebar slides in over the page at 768px and narrower. */
@@ -772,7 +773,9 @@
     .search-wrap { order: 3; flex: 1 1 100%; max-width: none; margin: 0; }
     .new-job-btn { min-height: 44px; }
     .composer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
-    .composer-bar .mode-select { max-width: 120px; }
+    .composer-bar { flex-wrap: wrap; }
+    .composer-hint { flex: 1 1 100%; }
+    .composer-bar .mode-select { flex: 1 1 0; max-width: none; min-width: 0; }
     .composer-add, .composer-bar .mode-select { min-height: 44px; }
     .composer-send { width: 44px; height: 44px; }
     .content { padding: 16px 16px 24px; }
@@ -826,7 +829,6 @@
 
     <section id="panel-main" class="panel">
       <div class="side-section">
-        <p id="ram-warning" class="notice" role="status" hidden></p>
       </div>
 
       <div class="result-tools">
@@ -921,6 +923,7 @@
           <svg class="hero-sparkle" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.5 4.9 2.6 7 7.5 7.5-4.9.5-7 2.6-7.5 7.5-.5-4.9-2.6-7-7.5-7.5 4.9-.5 7-2.6 7.5-7.5Z" fill="currentColor"/></svg>
           <h2 class="empty-heading">อ่านข้อความจากรูปหรือ PDF</h2>
           <p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF</p>
+          <p class="empty-sub">สูงสุด 30 หน้า · ไฟล์ละไม่เกิน 50 MB</p>
           <div class="start-grid">
             <button class="start-card" type="button" data-mode="auto">
               <svg class="start-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18"/></svg>
@@ -968,6 +971,7 @@
       </div>
 
       <footer class="composer">
+        <p id="ram-warning" class="notice" role="status" hidden></p>
         <div id="dropzone" class="composer-bar">
           <input id="file-input" type="file" accept="image/*,.pdf,application/pdf" hidden>
           <span class="composer-hint">ลากไฟล์มาวางที่นี่ หรือกด Ctrl+V</span>
@@ -1957,6 +1961,7 @@
   // Start cards: a mode card sets the mode (saved like the select) and opens the picker; the jobs card is the nav item.
   Array.prototype.forEach.call(document.querySelectorAll(".start-card"), function (card) {
     card.addEventListener("click", function () {
+      if (busy) return;
       if (card.dataset.action === "jobs") {
         navJobs.click();
         return;
