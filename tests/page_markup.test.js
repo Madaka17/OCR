@@ -158,43 +158,35 @@ function startCard(hero, attr) {
   return m[1];
 }
 
-test("index.html: empty-state hero with four start cards", () => {
+test("index.html: empty-state hero with two start cards", () => {
   const html = read("index.html");
   const hero = block(html, null, '<div id="empty-state"', '<div id="status"');
   assert.match(hero, /<svg class="hero-sparkle" width="40" height="40"/, "40px sparkle svg");
   assert.match(hero, /<h2 class="empty-heading">อ่านข้อความจากรูปหรือ PDF<\/h2>/, "hero heading");
   assert.match(hero, /<p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF<\/p>/, "hero sub line");
-  assert.equal((hero.match(/class="start-card"/g) || []).length, 4, "four start cards");
+  assert.equal((hero.match(/class="start-card"/g) || []).length, 2, "two start cards");
+  assert.doesNotMatch(hero, /data-mode=/, "no data-mode card left in the hero");
 
-  const auto = startCard(hero, 'data-mode="auto"');
-  assert.match(auto, /อ่านอัตโนมัติ/, "auto card title");
-  assert.match(auto, /<svg/, "auto card icon");
-
-  const browser = startCard(hero, 'data-mode="browser"');
-  assert.match(browser, /อ่านบนเครื่องนี้/, "browser card title");
-  assert.match(browser, /ไฟล์ไม่ออกนอกเครื่อง/, "browser card sub line");
-  assert.match(browser, /<svg/, "browser card icon");
-
-  const server = startCard(hero, 'data-mode="server"');
-  assert.match(server, /ส่งเข้าคิว server/, "server card title");
-  assert.match(server, /พร้อมสรุปด้วย AI/, "server card sub line");
-  assert.match(server, /<svg/, "server card icon");
+  const upload = startCard(hero, 'data-action="upload"');
+  assert.match(upload, /อัปโหลดไฟล์/, "upload card title");
+  assert.match(upload, /ส่งเข้าคิว พร้อมสรุปด้วย AI/, "upload card sub line");
+  assert.match(upload, /<svg/, "upload card icon");
 
   const jobs = startCard(hero, 'data-action="jobs"');
   assert.match(jobs, /งานของฉัน/, "jobs card title");
   assert.match(jobs, /<svg/, "jobs card icon");
 });
 
-test("index.html: #mode-select exists once, lives in the composer, and keeps its options", () => {
+test("index.html: no mode choice left, one file input", () => {
   const html = read("index.html");
-  assert.equal((html.match(/id="mode-select"/g) || []).length, 1, "mode-select appears once");
+  assert.equal((html.match(/id="mode-select"/g) || []).length, 0, "mode-select is gone");
+  assert.equal((html.match(/id="ram-warning"/g) || []).length, 0, "ram-warning is gone");
   assert.equal((html.match(/id="file-input"/g) || []).length, 1, "file-input appears once");
-  const composer = block(html, null, '<footer class="composer">', "</footer>");
-  assert.match(composer, /<select id="mode-select"/, "mode-select is in the composer");
-  assert.match(composer, /<label for="mode-select"[^>]*class="sr-only"[^>]*>โหมดการอ่าน<\/label>/, "visually hidden label");
-  for (const value of ["auto", "browser", "server"]) {
-    assert.match(composer, new RegExp(`<option value="${value}">`), `option ${value}`);
-  }
+});
+
+test("index.html: model pill is static server text", () => {
+  const html = read("index.html");
+  assert.match(html, /<span id="model-pill">อ่านผ่าน server<\/span>/, "model pill text");
 });
 
 test("index.html: bottom upload bar contract", () => {
@@ -210,7 +202,7 @@ test("index.html: bottom upload bar contract", () => {
 test("index.html: start cards and bar wire to the existing handlers", () => {
   const html = read("index.html");
   const script = html.slice(html.lastIndexOf("<script>"));
-  assert.match(script, /modeSelect\.value = mode;[\s\S]{0,200}modeSelect\.dispatchEvent\(new Event\("change", \{ bubbles: true \}\)\);[\s\S]{0,80}fileInput\.click\(\);/, "mode card sets, dispatches change, opens picker");
+  assert.match(script, /action === "upload"[\s\S]{0,120}fileInput\.click\(\)/, "upload card opens the picker");
   assert.match(script, /action === "jobs"[\s\S]{0,120}navJobs\.click\(\)/, "jobs card reuses the nav handler");
   assert.match(html, /body:not\(\.result-open\) \.new-job-btn \{ display: none; \}/, "new-job button hidden without a result");
   assert.match(html, /\.composer-bar\.drag \{[^}]*outline: 2px dashed var\(--primary\)/, "drag state uses --primary dashed outline");
@@ -228,30 +220,28 @@ test("index.html: main is a flex column so the composer pins to the bottom", () 
   assert.match(html, /\.content \{[^}]*flex: 1/, ".content grows so the composer sits at the bottom");
 });
 
-test("index.html: composer wraps on mobile, hint takes its own row, select fills the rest", () => {
+test("index.html: composer wraps on mobile, hint takes its own row", () => {
   const html = read("index.html");
   const start = html.indexOf("@media (max-width: 768px)");
   const media = html.slice(start, html.indexOf("@media (prefers-reduced-motion: reduce)", start));
   assert.match(media, /\.composer-bar \{[^}]*flex-wrap: wrap/, "bar wraps");
   assert.match(media, /\.composer-hint \{[^}]*flex: 1 1 100%/, "hint takes a full row");
-  assert.match(media, /\.composer-bar \.mode-select \{[^}]*flex: 1 1 0/, "select takes the remaining width");
-});
-
-test("index.html: ram warning sits above the bottom bar, once", () => {
-  const html = read("index.html");
-  assert.equal((html.match(/id="ram-warning"/g) || []).length, 1, "ram-warning appears once");
-  const composer = block(html, null, '<footer class="composer">', "</footer>");
-  assert.match(composer, /<p id="ram-warning" class="notice" role="status" hidden><\/p>/, "in the composer");
-  assert.ok(composer.indexOf('id="ram-warning"') < composer.indexOf('id="dropzone"'), "above the bar");
 });
 
 test("index.html: upload limits line under the hero sub", () => {
   const html = read("index.html");
-  assert.match(html, /<p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF<\/p>\s*<p class="empty-sub">สูงสุด 30 หน้า · ไฟล์ละไม่เกิน 50 MB<\/p>/, "limits line");
+  assert.match(html, /<p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF<\/p>\s*<p class="empty-sub">ไฟล์ละไม่เกิน 500 MB<\/p>/, "limits line");
 });
 
 test("index.html: start cards do nothing while busy", () => {
   const html = read("index.html");
   const script = html.slice(html.lastIndexOf("<script>"));
   assert.match(script, /addEventListener\("click", function \(\) \{\s*if \(busy\) return;\s*if \(card\.dataset\.action === "jobs"\)/, "busy guard first");
+});
+
+test("index.html: inline script has no browser OCR worker", () => {
+  const html = read("index.html");
+  const script = html.slice(html.lastIndexOf("<script>"));
+  assert.doesNotMatch(script, /new Worker\(/, "no in-browser worker");
+  assert.doesNotMatch(script, /startWorker/, "no startWorker");
 });

@@ -274,9 +274,7 @@
   }
   .composer-bar.drag { outline: 2px dashed var(--primary); outline-offset: 3px; }
   .composer-bar.busy { opacity: 0.6; cursor: progress; pointer-events: none; }
-  .composer > .notice { max-width: 760px; margin: 0 auto 8px; }
   .composer-hint { flex: 1 1 0; min-width: 0; color: var(--muted); font-size: 0.9rem; overflow-wrap: anywhere; }
-  .composer-bar .mode-select { max-width: 150px; min-height: 40px; }
   .composer-add { flex: none; white-space: nowrap; }
   .composer-send {
     flex: none;
@@ -489,7 +487,7 @@
   .hero-sparkle { display: block; width: 40px; height: 40px; color: var(--primary); }
   .start-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     width: 100%;
     max-width: 720px;
@@ -516,8 +514,6 @@
   .start-icon { display: block; color: var(--primary); }
   .start-title { font-weight: 600; font-size: 0.95rem; }
   .start-sub { color: var(--muted); font-size: 0.82rem; }
-  @media (max-width: 899px) { .start-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 479px) { .start-grid { grid-template-columns: minmax(0, 1fr); } }
   .empty-heading { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
   .empty-sub { color: var(--muted); font-size: 0.9rem; max-width: 40ch; }
   .empty-title { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
@@ -688,31 +684,7 @@
   }
   .empty { color: var(--muted); padding: 10px 14px; }
 
-  /* ---- server jobs (queue for large files, mode choice, my jobs) ---- */
-  .mode-select {
-    font: inherit;
-    font-size: 0.88rem;
-    min-height: 40px;
-    padding: 6px 14px;
-    border-radius: var(--chip-radius);
-    border: 1px solid var(--border);
-    background: var(--field);
-    color: var(--text);
-    max-width: 60%;
-  }
-  .mode-select:focus {
-    outline: none;
-    border-color: var(--accent-strong);
-    box-shadow: 0 0 0 3px var(--accent-soft);
-  }
-  .notice {
-    margin: 10px 0 0;
-    padding: 8px 14px;
-    border-radius: var(--chip-radius);
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-size: 0.85rem;
-  }
+  /* ---- server jobs (upload queue, my jobs) ---- */
   .jobs-card { margin: 0 0 18px; }
   .jobs-head {
     display: flex;
@@ -775,8 +747,7 @@
     .composer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
     .composer-bar { flex-wrap: wrap; }
     .composer-hint { flex: 1 1 100%; }
-    .composer-bar .mode-select { flex: 1 1 0; max-width: none; min-width: 0; }
-    .composer-add, .composer-bar .mode-select { min-height: 44px; }
+    .composer-add { min-height: 44px; }
     .composer-send { width: 44px; height: 44px; }
     .content { padding: 16px 16px 24px; }
   }
@@ -885,8 +856,8 @@
         </button>
         <button id="logout-btn" class="nav-item" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>ออกจากระบบ</span></button>
       </div>
-      <p class="model-line"><span class="status-pill"><span class="dot" aria-hidden="true"></span><span id="model-pill">กำลังโหลดโมเดล…</span></span></p>
-      <p class="sidebar-foot muted">ทำงานในเบราว์เซอร์ของคุณ ไม่ส่งไฟล์ออกนอกเครื่อง</p>
+      <p class="model-line"><span class="status-pill"><span class="dot" aria-hidden="true"></span><span id="model-pill">อ่านผ่าน server</span></span></p>
+      <p class="sidebar-foot muted">ไฟล์ถูกส่งไปอ่านที่ server พร้อมสรุปด้วย AI</p>
     </div>
   </aside>
 
@@ -922,22 +893,12 @@
           <svg class="hero-sparkle" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.5 4.9 2.6 7 7.5 7.5-4.9.5-7 2.6-7.5 7.5-.5-4.9-2.6-7-7.5-7.5 4.9-.5 7-2.6 7.5-7.5Z" fill="currentColor"/></svg>
           <h2 class="empty-heading">อ่านข้อความจากรูปหรือ PDF</h2>
           <p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF</p>
-          <p class="empty-sub">สูงสุด 30 หน้า · ไฟล์ละไม่เกิน 50 MB</p>
+          <p class="empty-sub">ไฟล์ละไม่เกิน 500 MB</p>
           <div class="start-grid">
-            <button class="start-card" type="button" data-mode="auto">
-              <svg class="start-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18"/></svg>
-              <span class="start-title">อ่านอัตโนมัติ</span>
-              <span class="start-sub">ระบบเลือกวิธีให้เอง</span>
-            </button>
-            <button class="start-card" type="button" data-mode="browser">
-              <svg class="start-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
-              <span class="start-title">อ่านบนเครื่องนี้</span>
-              <span class="start-sub">ไฟล์ไม่ออกนอกเครื่อง</span>
-            </button>
-            <button class="start-card" type="button" data-mode="server">
+            <button class="start-card" type="button" data-action="upload">
               <svg class="start-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3H4z"/><path d="M4 14h16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
-              <span class="start-title">ส่งเข้าคิว server</span>
-              <span class="start-sub">พร้อมสรุปด้วย AI</span>
+              <span class="start-title">อัปโหลดไฟล์</span>
+              <span class="start-sub">ส่งเข้าคิว พร้อมสรุปด้วย AI</span>
             </button>
             <button class="start-card" type="button" data-action="jobs">
               <svg class="start-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
@@ -970,16 +931,9 @@
       </div>
 
       <footer class="composer">
-        <p id="ram-warning" class="notice" role="status" hidden></p>
         <div id="dropzone" class="composer-bar">
           <input id="file-input" type="file" accept="image/*,.pdf,application/pdf" hidden>
           <span class="composer-hint">ลากไฟล์มาวางที่นี่ หรือกด Ctrl+V</span>
-          <label for="mode-select" class="sr-only">โหมดการอ่าน</label>
-          <select id="mode-select" class="mode-select">
-            <option value="auto">อัตโนมัติ</option>
-            <option value="browser">อ่านบนเครื่องนี้</option>
-            <option value="server">ส่งเข้าคิว server</option>
-          </select>
           <label for="file-input" class="btn btn-primary composer-add"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>เพิ่มไฟล์</span></label>
           <button type="button" class="composer-send" id="composer-send" aria-label="เลือกไฟล์"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
         </div>
@@ -1541,229 +1495,23 @@
     runSearch();
   }
 
-  // ---- OCR worker (js/worker.js) and page decoding, all in the browser ----
-
-  var DECODE_ERROR = "ไฟล์นี้ไม่ใช่รูปภาพหรือ PDF ที่อ่านได้";
-  var PDF_SCALE = 200 / 72;
-  var MAX_LONG_SIDE = 4000;
-  var MAX_PIXELS = 16000000;
-  var OCR_TIMEOUT_MS = 120000;
-  var TIMEOUT_ERROR = "การอ่านหน้านี้ใช้เวลานานเกินไป โปรดรีโหลดหน้า";
-  var STOPPED_ERROR = "ตัวประมวลผลหยุดทำงาน โปรดรีโหลดหน้า";
-  var PILL_READY = "โมเดลพร้อม";
-  var PILL_FAILED = "โหลดโมเดลไม่สำเร็จ";
-  var modelPill = document.getElementById("model-pill");
-  var modelReady = false;
-  var worker = null;
-  var nextJobId = 1;
-  var jobs = new Map();
-  var readyResolve;
-  var readyReject;
-  var ready = new Promise(function (resolve, reject) {
-    readyResolve = resolve;
-    readyReject = reject;
-  });
-  ready.catch(function () {}); // each upload that awaits it reports the failure
-
-  // Ends the worker: every waiting job and the ready wait get err. The page must be reloaded.
-  function stopWorker(err) {
-    readyReject(err);
-    jobs.forEach(function (job) { job.reject(err); });
-    jobs.clear();
-    if (worker) worker.terminate();
-    worker = null;
-    if (!busy) {
-      statusBox.hidden = true;
-      showError(err.message);
-    }
-  }
-
-  function failLoad(message) {
-    modelPill.textContent = PILL_FAILED;
-    stopWorker(new Error(modelReady
-      ? STOPPED_ERROR + ": " + message
-      : "โหลดโมเดลไม่สำเร็จ: " + message));
-  }
-
-  function startWorker() {
-    worker = new Worker("js/worker.js");
-    worker.onmessage = function (e) {
-      var msg = e.data;
-      if (msg.type === "ready") {
-        modelReady = true;
-        modelPill.textContent = PILL_READY;
-        readyResolve();
-        if (!busy) statusBox.hidden = true;
-      } else if (msg.type === "error" && msg.id === null) {
-        failLoad(msg.message);
-      } else {
-        var job = jobs.get(msg.id);
-        if (!job) return;
-        jobs.delete(msg.id);
-        if (msg.type === "result") job.resolve(msg);
-        else job.reject(new Error(msg.message));
-      }
-    };
-    worker.onerror = function (e) {
-      failLoad(e.message || "worker error");
-    };
-  }
-
-  function ocrPage(width, height, rgba) {
-    return new Promise(function (resolve, reject) {
-      if (!worker) {
-        reject(new Error(STOPPED_ERROR));
-        return;
-      }
-      var id = nextJobId++;
-      // A page that hangs would keep the UI busy forever: stop the worker and fail the job.
-      var timer = setTimeout(function () {
-        stopWorker(new Error(TIMEOUT_ERROR));
-      }, OCR_TIMEOUT_MS);
-      jobs.set(id, {
-        resolve: function (value) { clearTimeout(timer); resolve(value); },
-        reject: function (err) { clearTimeout(timer); reject(err); }
-      });
-      worker.postMessage({ type: "ocr", id: id, width: width, height: height, rgba: rgba }, [rgba]);
-    });
-  }
-
-  // White-backed canvas (integer size): transparent pixels would otherwise read as black.
-  function makeCanvas(width, height) {
-    var canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    var ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, width, height);
-    return canvas;
-  }
-
-  // Factor (at most 1) that keeps the long side <= MAX_LONG_SIDE and the area <= MAX_PIXELS.
-  function fitScale(width, height) {
-    return Math.min(1, MAX_LONG_SIDE / Math.max(width, height), Math.sqrt(MAX_PIXELS / (width * height)));
-  }
-
-  // Resolves to {count, render(i), close()}: images are one page, PDF pages render on demand.
-  async function openSource(file) {
-    var head = await file.slice(0, 4).text();
-    if (/\.pdf$/i.test(file.name || "") || head === "%PDF") {
-      var pdfjs = await import("./vendor/pdf.min.mjs");
-      pdfjs.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
-      // destroy() lives on the loading task in this pdfjs version, not on the document.
-      var task = pdfjs.getDocument({
-        data: new Uint8Array(await file.arrayBuffer()),
-        isEvalSupported: false,
-        enableXfa: false
-      });
-      var doc = await task.promise;
-      return {
-        count: doc.numPages,
-        render: async function (i) {
-          var page = await doc.getPage(i + 1);
-          try {
-            // Clamp the render scale per page so the canvas stays within the pixel caps.
-            var base = page.getViewport({ scale: 1 });
-            var scale = PDF_SCALE * fitScale(base.width * PDF_SCALE, base.height * PDF_SCALE);
-            var viewport = page.getViewport({ scale: scale });
-            var canvas = makeCanvas(Math.floor(viewport.width), Math.floor(viewport.height));
-            await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
-            return canvas;
-          } finally {
-            page.cleanup();
-          }
-        },
-        close: function () { task.destroy().catch(function () {}); }
-      };
-    }
-    var bitmap = await createImageBitmap(file);
-    var s = fitScale(bitmap.width, bitmap.height);
-    var width = Math.max(1, Math.floor(bitmap.width * s));
-    var height = Math.max(1, Math.floor(bitmap.height * s));
-    var canvas = makeCanvas(width, height);
-    canvas.getContext("2d").drawImage(bitmap, 0, 0, width, height);
-    if (bitmap.close) bitmap.close();
-    return { count: 1, render: async function () { return canvas; }, close: function () {} };
-  }
-
-  // Builds the same object as web_app.run_ocr: {filename, text, pages[]}.
-  async function runUpload(file, name) {
-    await ready;
-    var source;
-    try {
-      source = await openSource(file);
-    } catch (err) {
-      throw new Error(DECODE_ERROR);
-    }
-    try {
-      var pages = [];
-      for (var i = 0; i < source.count; i++) {
-        statusText.textContent = "กำลังอ่าน " + name + " หน้า " + (i + 1) + "/" + source.count + " …";
-        var canvas, rgba, image;
-        try {
-          canvas = await source.render(i);
-          rgba = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data.buffer;
-          image = canvas.toDataURL("image/jpeg", 0.85);
-        } catch (err) {
-          throw new Error(DECODE_ERROR);
-        }
-        var out = await ocrPage(canvas.width, canvas.height, rgba);
-        pages.push({
-          number: i + 1,
-          width: canvas.width,
-          height: canvas.height,
-          seconds: out.seconds,
-          image: image,
-          text: out.text,
-          lines: out.lines,
-          fields: out.fields || []
-        });
-      }
-      return {
-        filename: name,
-        text: pages.map(function (p) { return p.text; }).join("\n\n"),
-        pages: pages
-      };
-    } finally {
-      source.close();
-    }
-  }
-
-  // Mode choice (server jobs block below): the file is read here or queued on the server.
+  // Every upload is queued on the server (submitToServer, in the server jobs block below).
   function upload(file) {
     if (busy) return;
     var name = file.name || "clipboard.png";
-    var choice = readMode();
     setBusy(true);
     errorBox.hidden = true;
-    ramWarning.hidden = true;
     emptyState.hidden = true;
-    statusText.textContent = "กำลังตรวจสอบ " + name + " …";
+    statusText.textContent = "กำลังเริ่มอัปโหลด " + name + " …";
     statusBox.hidden = false;
 
-    return planUpload(file, choice).then(function (plan) {
-      if (plan.mode === "server") return submitToServer(file, name);
-      showRamWarning(plan.pages);
-      clearResults();
-      statusText.textContent = modelReady ? "กำลังอ่าน " + name + " …" : "กำลังโหลดโมเดล…";
-      return runUpload(file, name).then(function (data) {
-        renderResult(data);
-      });
-    }).catch(function (err) {
+    return submitToServer(file, name).catch(function (err) {
       showError(err.message);
     }).then(function () {
       statusBox.hidden = true;
       if (!currentData) emptyState.hidden = false;
       setBusy(false);
     });
-  }
-
-  statusText.textContent = "กำลังโหลดโมเดล…";
-  statusBox.hidden = false;
-  try {
-    startWorker();
-  } catch (err) {
-    failLoad(err.message);
   }
 
   // ---- wiring (once, the controls are static) ----
@@ -1966,18 +1714,12 @@
   composerSend.addEventListener("click", function () {
     if (!busy) fileInput.click();
   });
-  // Start cards: a mode card sets the mode (saved like the select) and opens the picker; the jobs card is the nav item.
+  // Start cards: the upload card opens the picker; the jobs card is the nav item.
   Array.prototype.forEach.call(document.querySelectorAll(".start-card"), function (card) {
     card.addEventListener("click", function () {
       if (busy) return;
-      if (card.dataset.action === "jobs") {
-        navJobs.click();
-        return;
-      }
-      var mode = card.dataset.mode;
-      modeSelect.value = mode;
-      modeSelect.dispatchEvent(new Event("change", { bubbles: true }));
-      fileInput.click();
+      if (card.dataset.action === "jobs") navJobs.click();
+      else if (card.dataset.action === "upload") fileInput.click();
     });
   });
   ["dragenter", "dragover"].forEach(function (type) {
@@ -2035,13 +1777,10 @@
     var file = item.getAsFile();
     if (file) upload(file);
   });
-  // ---- server jobs: mode choice, chunked upload to the queue, "my jobs" panel ----
-  // Pure helpers (decideMode, chunkRanges, formatEta, formatBytes) live in js/jobs_client.js.
+  // ---- server jobs: chunked upload to the queue, "my jobs" panel ----
+  // Pure helpers (chunkRanges, formatEta, formatBytes) live in js/jobs_client.js.
 
-  var BROWSER_MAX_BYTES = 50 * 1024 * 1024;
-  var BROWSER_MAX_PAGES = 30;
   var CHUNK_RETRIES = 3;
-  var MODE_KEY = "ocr-mode";
   var SESSION_ERROR = "กรุณาเข้าสู่ระบบ";
   var ACTIVE_STATES = ["uploading", "queued", "running"];
   var STATE_LABELS = {
@@ -2055,8 +1794,6 @@
   var POLL_ACTIVE_MS = 5000;
   var POLL_IDLE_MS = 60000;
 
-  var modeSelect = document.getElementById("mode-select");
-  var ramWarning = document.getElementById("ram-warning");
   var jobsCard = document.getElementById("jobs-card");
   var jobsList = document.getElementById("jobs-list");
   var jobsCount = document.getElementById("jobs-count");
@@ -2070,47 +1807,6 @@
   var jobsInFlight = null;   // promise of the poll in progress
   var jobsAgain = false;     // a refresh was asked for while a poll was in progress
   var notifyAsked = false;
-
-  function readMode() {
-    var value = null;
-    try { value = localStorage.getItem(MODE_KEY); } catch (err) {}
-    return value === "browser" || value === "server" ? value : "auto";
-  }
-
-  function saveMode(value) {
-    try { localStorage.setItem(MODE_KEY, value); } catch (err) {}
-  }
-
-  function showRamWarning(pages) {
-    var long = pages !== null && pages > BROWSER_MAX_PAGES;
-    ramWarning.hidden = !long;
-    if (long) {
-      ramWarning.textContent = "ไฟล์ยาว " + pages + " หน้า อาจใช้ RAM มากและต้องเปิดแท็บค้างไว้จนเสร็จ";
-    }
-  }
-
-  function countPages(file) {
-    return openSource(file).then(function (source) {
-      var count = source.count;
-      source.close();
-      return count;
-    });
-  }
-
-  // Resolves to {mode: "browser" | "server", pages: number | null}.
-  function planUpload(file, choice) {
-    if (choice === "server") return Promise.resolve({ mode: "server", pages: null });
-    if (choice === "auto" && file.size > BROWSER_MAX_BYTES) {
-      return Promise.resolve({ mode: "server", pages: null });
-    }
-    return countPages(file).then(function (pages) {
-      var mode = choice === "browser" ? "browser" : JobsClient.decideMode(file.size, pages);
-      return { mode: mode, pages: pages };
-    }, function () {
-      // Not readable here: the browser path reports the usual decode error.
-      return { mode: "browser", pages: null };
-    });
-  }
 
   function sessionExpired() {
     location.href = "/login.html?next=" + encodeURIComponent(location.pathname + location.search);
@@ -2535,12 +2231,6 @@
   }
 
   // ---- init ----
-
-  modeSelect.value = readMode();
-  modeSelect.addEventListener("change", function () {
-    saveMode(modeSelect.value);
-    ramWarning.hidden = true;
-  });
 
   logoutBtn.addEventListener("click", function () {
     fetch("/api/logout", { method: "POST", credentials: "same-origin" }).then(function () {}, function () {})
