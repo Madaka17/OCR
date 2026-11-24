@@ -718,10 +718,11 @@
       height: 100dvh;
       transform: translateX(-100%);
       visibility: hidden;
-      transition: transform 0.2s ease, visibility 0.2s;
+      /* Closing: slide out, then hide. Opening (below): visible at once, so focus works. */
+      transition: transform 0.2s ease, visibility 0s linear 0.2s;
       box-shadow: var(--shadow);
     }
-    .sidebar.drawer-open { transform: none; visibility: visible; }
+    .sidebar.drawer-open { transform: none; visibility: visible; transition: transform 0.2s ease, visibility 0s; }
     .drawer-overlay { display: block; position: fixed; inset: 0; z-index: 20; background: var(--overlay); }
     .menu-btn { display: inline-flex; }
     .app-header { padding: 8px 16px; }
@@ -1761,14 +1762,10 @@
     menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
     drawerOverlay.hidden = !open;
     if (open) {
-      // Flush styles so the drawer is focusable, then focus the first nav item.
-      // Retry on the next frame in case the visibility transition still gates focus.
+      // Flush styles so the drawer is focusable (CSS makes visibility switch on at once), then focus the first nav item.
       var first = sidebar.querySelector(".nav-item");
       void sidebar.offsetWidth;
       if (first) first.focus();
-      requestAnimationFrame(function () {
-        if (drawerIsOpen() && first && !sidebar.contains(document.activeElement)) first.focus();
-      });
     } else {
       menuBtn.focus();
     }

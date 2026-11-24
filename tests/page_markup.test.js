@@ -98,7 +98,11 @@ test("index.html: drawer moves focus in after a layout flush, and jobs nav shows
   const html = read("index.html");
   const setDrawer = html.slice(html.indexOf("function setDrawer(open)"), html.indexOf("function closeDrawer()"));
   assert.match(setDrawer, /sidebar\.offsetWidth/, "forces a style flush before focusing");
-  assert.match(setDrawer, /requestAnimationFrame\(/, "retries focus on the next frame");
+  assert.doesNotMatch(setDrawer, /requestAnimationFrame/, "no rAF retry: visibility is switched in CSS");
+  const css = html.slice(html.indexOf("@media (max-width: 768px)"), html.indexOf("@media (min-width: 1200px)"));
+  assert.match(css, /\.sidebar \{[^}]*transition: transform 0\.2s ease, visibility 0s linear 0\.2s/, "closed: visibility hides after the slide");
+  assert.match(css, /\.sidebar\.drawer-open \{[^}]*visibility: visible[^}]*transition: transform 0\.2s ease, visibility 0s/, "open: visibility switches on at once");
+  assert.match(css, /\.sidebar \{ transition: none; \}/, "reduced motion disables the transition");
   const jobs = html.slice(html.indexOf('navJobs.addEventListener("click"'), html.indexOf('navExport.addEventListener("click"'));
   assert.match(jobs, /jobs-list[\s\S]*children\.length/, "jobs card shown only when the list has items");
   assert.match(jobs, /scrollIntoView/, "scrolls to the top of the content");
