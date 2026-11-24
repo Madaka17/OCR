@@ -262,6 +262,15 @@ def test_login_page_is_public_and_static_serves_with_session(env):
     assert b"home" in r.body
 
 
+def test_webp_served_as_image_webp_to_logged_in_user(env):
+    (env.tmp / "site" / "img").mkdir()
+    (env.tmp / "site" / "img" / "hero.webp").write_bytes(b"RIFF\x00\x00\x00\x00WEBPVP8 ")
+    user = logged_in(env)
+    r = user.request("GET", "/img/hero.webp")
+    assert r.status == 200
+    assert r.header("Content-Type") == "image/webp"
+
+
 def test_theme_assets_public(env):
     anon = env.client.fresh()
     r = anon.request("GET", "/css/theme.css")

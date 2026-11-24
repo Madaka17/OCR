@@ -57,6 +57,7 @@ CONTENT_TYPES = {
     ".txt": "text/plain; charset=utf-8",
     ".png": "image/png",
     ".svg": "image/svg+xml",
+    ".webp": "image/webp",
 }
 
 _JOB = r"/api/jobs/([^/]+)"

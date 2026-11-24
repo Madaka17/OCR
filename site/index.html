@@ -500,7 +500,7 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent), var(--shadow);
   }
-  .hero-sparkle { display: block; width: 40px; height: 40px; color: var(--primary); }
+  .hero-sparkle { display: block; width: 96px; height: 96px; margin: 0 auto; border-radius: 50%; object-fit: cover; object-position: 50% 35%; border: 3px solid var(--card); box-shadow: 0 0 0 2px var(--primary); }
   .start-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -907,7 +907,7 @@
         </section>
 
         <div id="empty-state" class="card empty-card">
-          <svg class="hero-sparkle" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.5 4.9 2.6 7 7.5 7.5-4.9.5-7 2.6-7.5 7.5-.5-4.9-2.6-7-7.5-7.5 4.9-.5 7-2.6 7.5-7.5Z" fill="currentColor"/></svg>
+          <img class="hero-sparkle" src="img/hero.webp" width="96" height="96" alt="" decoding="async">
           <h2 class="empty-heading">อ่านข้อความจากรูปหรือ PDF</h2>
           <p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF</p>
           <p class="empty-sub">ไฟล์ละไม่เกิน 500 MB</p>
