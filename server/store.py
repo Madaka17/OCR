@@ -7,6 +7,7 @@ import shutil
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 from server import settings
@@ -28,6 +29,24 @@ class JobError(Exception):
         self.message = message
 
 
+# On Windows, os.replace fails with PermissionError while another thread has the
+# target open (a status poll reading summary.json or meta.json). The reader holds it
+# for well under a millisecond, so a few short retries ride it out. Elsewhere a
+# PermissionError is a real permission problem, so it is raised at once.
+SHARING_RETRIES = 10 if os.name == "nt" else 1
+SHARING_RETRY_SECONDS = 0.01
+
+
+def _retry_sharing(fn, *args):
+    for attempt in range(SHARING_RETRIES):
+        try:
+            return fn(*args)
+        except PermissionError:
+            if attempt == SHARING_RETRIES - 1:
+                raise
+            time.sleep(SHARING_RETRY_SECONDS * (attempt + 1))
+
+
 def _atomic_write(path: Path, data: bytes) -> None:
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
     try:
@@ -35,7 +54,7 @@ def _atomic_write(path: Path, data: bytes) -> None:
             f.write(data)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, path)
+        _retry_sharing(os.replace, tmp, path)
     except BaseException:
         if os.path.exists(tmp):
             os.unlink(tmp)
@@ -71,7 +90,7 @@ class JobStore:
     def _read_json_file(self, path: Path) -> dict | None:
         """Parsed JSON object, or None when the file is missing or unreadable."""
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            return json.loads(_retry_sharing(path.read_text, "utf-8"))
         except FileNotFoundError:
             return None
         except (ValueError, OSError) as e:
@@ -87,7 +106,7 @@ class JobStore:
         data = json.dumps(meta, ensure_ascii=False).encode("utf-8")
         _atomic_write(self._job_dir(meta["id"]) / "meta.json", data)
 
-    def create(self, owner: str, filename: str, size: int, now: float) -> dict:
+    def create(self, owner: str, filename: str, size: int, now: float, model: str | None = None) -> dict:
         if size <= 0:
             raise JobError(400, "ไฟล์ว่างเปล่า")
         if size > settings.MAX_JOB_BYTES:
@@ -107,6 +126,8 @@ class JobStore:
             "failed_pages": [],
             "error": None,
         }
+        if model is not None:
+            meta["model"] = model
         with self._lock:
             (self._job_dir(job_id) / "upload").mkdir(parents=True)
             self._save_meta(meta)
@@ -204,6 +225,24 @@ class JobStore:
         if not _valid_id(job_id):
             return None
         return self._read_json_file(self._job_dir(job_id) / "pages" / f"{number}.json")
+
+    def read_summary(self, job_id: str) -> dict | None:
+        if not _valid_id(job_id):
+            return None
+        return self._read_json_file(self._job_dir(job_id) / "summary.json")
+
+    def has_summary(self, job_id: str) -> bool:
+        """True when summary.json exists, even if it cannot be read right now."""
+        return _valid_id(job_id) and (self._job_dir(job_id) / "summary.json").exists()
+
+    def write_summary(self, job_id: str, data: dict) -> bool:
+        """Atomically write summary.json. Writes nothing when the job's meta.json is gone."""
+        with self._lock:
+            if not _valid_id(job_id) or self._read_meta(job_id) is None:
+                return False
+            payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            _atomic_write(self._job_dir(job_id) / "summary.json", payload)
+            return True
 
     def _page_ok(self, path: Path) -> bool:
         """A page file counts only if it parses. A file that does not parse is deleted so

@@ -1,0 +1,95 @@
+from server.factcheck import normalize, find_value, check_items
+
+PAGES = {
+    5: "มูลค่า 136,531,093.13 บาท",
+    33: "อาคาร 34,358,800 บาท",
+    81: "วันที่ 8 เดือน พฤษภาคม พ.ศ. 2568",
+    85: "สัญญาจำนองฉบับลงวันที่ 16 มาราคม 2567",
+    113: "ใช้ได้จนถึงวันที่๒๗ พ.. อแัจลี",
+    1: "ประเมิน ณ วันที่ 21 เม.ย. 2569",
+    10: "ราคา 12,000,000 บาท",
+}
+
+def test_date_with_filler_words_found():
+    assert find_value("8 พฤษภาคม 2568", PAGES) == [81]
+
+def test_abbreviated_month_found():
+    assert find_value("21 เมษายน 2569", PAGES) == [1]
+
+def test_wrong_month_not_found():
+    assert find_value("16 เมษายน 2567", PAGES) == []
+
+def test_invented_date_not_found():
+    assert find_value("27 เมษายน 2569", PAGES) == []
+
+def test_date_not_matched_inside_longer_day():
+    assert find_value("8 พฤษภาคม 2568", {1: "วันที่ 18 พฤษภาคม 2568"}) == []
+
+def test_amount_with_decimals_and_unit():
+    assert find_value("136,531,093.13 บาท", PAGES) == [5]
+
+def test_amount_trailing_zero_decimals_match_integer():
+    assert find_value("34,358,800.00 บาท", PAGES) == [33]
+
+def test_amount_not_matched_inside_bigger_number():
+    assert find_value("2,000,000", PAGES) == []
+
+def test_thai_digits_normalized():
+    assert find_value("27", {1: "หน้า ๒๗"}) == [1]
+
+def test_check_items_corrects_page_and_flags_missing():
+    items = [{"label": "a", "value": "136,531,093.13", "page": 9},
+             {"label": "b", "value": "27 เมษายน 2569", "page": 113},
+             {"label": "c", "value": "ไม่มีตัวเลข", "page": 1}]
+    out = check_items(items, PAGES)
+    assert [(i["page"], i["check"]) for i in out] == [(5, "ok"), (113, "none"), (1, "none")]
+    assert items[0]["page"] == 9  # input not mutated
+
+
+def test_month_year_date_found_after_a_day():
+    assert find_value("พฤษภาคม 2568", PAGES) == [81]
+
+
+def test_cut_off_year_not_found():
+    assert find_value("8 พฤษภาคม 256", PAGES) == []
+
+
+def test_whole_amount_not_matched_against_decimal_amount():
+    assert find_value("136,531,093 บาท", PAGES) == []
+    assert find_value("1.0", {1: "อัตรา 1.05"}) == []
+
+
+def test_amount_before_sentence_full_stop_still_found():
+    assert find_value("34,358,800", {33: "อาคาร 34,358,800."}) == [33]
+
+
+def test_amount_followed_by_another_number_found():
+    assert find_value("100,085,387.50 บาท", {1: "รวมราคา 100,085,387.50 136,531,093,13"}) == [1]
+
+
+def test_amount_preceded_by_number_found():
+    assert find_value("136,531,093.13", {1: "เดิม 100,085,387.50 136,531,093.13"}) == [1]
+
+
+def test_spaced_numeric_date_not_ok_from_scattered_numbers():
+    assert find_value("27 / 4 / 2569", {1: "หน้า 27 ข้อ 4 ปี 2569"}) == []
+
+
+def test_spaced_numeric_date_found_when_present():
+    assert find_value("27 / 4 / 2569", {1: "ลงวันที่ 27/4/2569"}) == [1]
+
+
+def test_period_list_marker_before_amount_found():
+    assert find_value("12,000", {1: "รายการที่ 5. 12,000 บาท"}) == [1]
+
+
+def test_period_between_amounts_keeps_second_amount():
+    assert find_value("2,250", {1: "ราคา 1,600. 2,250 บาท"}) == [1]
+
+
+def test_period_between_amounts_keeps_first_amount():
+    assert find_value("1,600", {1: "ราคา 1,600. 2,250 บาท"}) == [1]
+
+
+def test_period_list_marker_before_plain_number_found():
+    assert find_value("100", {1: "ข้อ 1. 100 บาท"}) == [1]

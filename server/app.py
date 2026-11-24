@@ -26,7 +26,7 @@ MAX_JSON_BODY = 64 * 1024
 MAX_DRAIN_BYTES = 200 * 1024 * 1024
 DRAIN_CHUNK_BYTES = 64 * 1024
 DISK_HEADROOM_BYTES = 1024**3  # free space kept back on top of twice the upload size
-PUBLIC_STATIC = ("/login.html",)
+PUBLIC_STATIC = ("/login.html", "/css/theme.css", "/js/theme.js")
 ADMIN_PAGE_PATHS = ("/admin", "/admin.html")
 
 MSG_NOT_FOUND = "ไม่พบหน้านี้"
@@ -41,6 +41,8 @@ MSG_NOT_UPLOADING = "งานนี้ไม่อยู่ในสถาน�
 MSG_CHUNK_TOO_BIG = "ชิ้นไฟล์ใหญ่เกินกำหนด"
 MSG_TOO_MANY_PAGES = "PDF มีมากเกิน 1000 หน้า"
 MSG_DISK_FULL = "พื้นที่ดิสก์บนเซิร์ฟเวอร์ไม่พอ"
+MSG_SUMMARY_OFF = "ไม่ได้เปิดใช้การสรุปด้วย AI"
+MSG_MODEL_INVALID = "โมเดลนี้ใช้ไม่ได้"
 MSG_SERVER_ERROR = "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์"
 
 CONTENT_TYPES = {
@@ -55,6 +57,7 @@ CONTENT_TYPES = {
     ".txt": "text/plain; charset=utf-8",
     ".png": "image/png",
     ".svg": "image/svg+xml",
+    ".webp": "image/webp",
 }
 
 _JOB = r"/api/jobs/([^/]+)"
@@ -219,6 +222,8 @@ class Handler(BaseHTTPRequestHandler):
         out["done_pages"] = len(store.done_pages(job_id))
         out["position"] = scheduler.queue_position(job_id)
         out["eta_seconds"] = scheduler.eta_seconds(job_id)
+        if self.server.summaries is not None:
+            out["summary_state"] = (store.read_summary(job_id) or {}).get("state")
         return out
 
     def _job_or_404(self, job_id: str) -> dict:
@@ -339,6 +344,9 @@ class Handler(BaseHTTPRequestHandler):
             ("GET", re.compile(_JOB + r"/result"), self._result),
             ("GET", re.compile(_JOB + r"/pages/(\d+)\.jpg"), self._page_jpg),
             ("GET", re.compile(_JOB + r"/text"), self._text),
+            ("GET", re.compile(_JOB + r"/summary"), self._get_summary),
+            ("POST", re.compile(_JOB + r"/summary"), self._post_summary),
+            ("GET", re.compile(r"/api/models"), self._list_models),
             ("GET", re.compile(r"/api/admin/overview"), self._admin_overview),
             ("DELETE", re.compile(r"/api/admin/jobs/([^/]+)"), self._admin_delete_job),
         ]
@@ -352,16 +360,36 @@ class Handler(BaseHTTPRequestHandler):
         metas = self.server.store.list(session["owner"])
         return self._json(200, [self._public(m, session) for m in metas])
 
+    def _list_models(self, session):
+        models = self.server.models
+        if models is None:
+            return self._json(200, {"models": [], "default": None})
+        return self._json(200, {"models": models.list(), "default": models.default})
+
+    def _model_from(self, body: dict) -> str | None:
+        """The model a job asked for, or None. Anything the catalog does not allow is a 400.
+
+        A "key" field, which an old cached page may still send, is ignored.
+        """
+        model = body.get("model")
+        if model is None:
+            return None
+        models = self.server.models
+        if models is None or not isinstance(model, str) or not model or not models.allowed(model):
+            raise JobError(400, MSG_MODEL_INVALID)
+        return model
+
     def _create_job(self, session):
         body = self._read_json()
         filename = body.get("filename")
         size = body.get("size")
         if not isinstance(filename, str) or not isinstance(size, int) or isinstance(size, bool):
             raise JobError(400, MSG_BAD_REQUEST)
+        model = self._model_from(body)
         free = shutil.disk_usage(_existing_ancestor(self.server.store.root)).free
         if free < size * 2 + DISK_HEADROOM_BYTES:
             raise JobError(507, MSG_DISK_FULL)
-        meta = self.server.store.create(session["owner"], filename, size, now=time.time())
+        meta = self.server.store.create(session["owner"], filename, size, now=time.time(), model=model)
         return self._json(201, {"job": self._public(meta, session), "chunk_size": settings.CHUNK_BYTES})
 
     def _get_job(self, session, job_id):
@@ -420,6 +448,18 @@ class Handler(BaseHTTPRequestHandler):
             pages.append(page)
         return self._json(200, {"filename": meta["filename"], "text": store.text(job_id), "pages": pages})
 
+    def _get_summary(self, session, job_id):
+        self._job_or_404(job_id)
+        if self.server.summaries is None:
+            return self._json(200, {"enabled": False})
+        record = self.server.store.read_summary(job_id) or {"state": None}
+        return self._json(200, {"enabled": True, **record})
+
+    def _post_summary(self, session, job_id):
+        if self.server.summaries is None:
+            raise JobError(503, MSG_SUMMARY_OFF)
+        return self._json(202, self.server.summaries.regenerate(job_id, time.time()))
+
     def _page_jpg(self, session, job_id, number):
         self._job_or_404(job_id)
         path = self.server.store.jobs_dir / job_id / "pages" / f"{int(number)}.jpg"
@@ -443,12 +483,14 @@ class Handler(BaseHTTPRequestHandler):
             {**rec, "file": names.get(rec.get("job"), rec.get("job"))}
             for rec in recent_errors(events.root)
         ]
+        summaries = self.server.summaries
         return self._json(200, {
             "jobs": [self._public(m, session) for m in metas],
             "stats": summary(events.root, now, jobs=metas),
             "errors": errors,
             "resources": resources(store.root),
             "workers": {"count": scheduler.workers, "alive": scheduler.alive()},
+            "llm": summaries.status() if summaries is not None else {"enabled": False},
         })
 
     def _admin_delete_job(self, session, job_id):
@@ -463,7 +505,8 @@ class Handler(BaseHTTPRequestHandler):
                           headers=[("Content-Disposition", f"attachment; filename*=UTF-8''{name}")])
 
 
-def make_server(host, port, store, scheduler, auth, events, site_dir=None) -> ThreadingHTTPServer:
+def make_server(host, port, store, scheduler, auth, events, site_dir=None, summaries=None,
+                models=None) -> ThreadingHTTPServer:
     """Create (but do not start) the HTTP server. site_dir defaults to settings.SITE_DIR at call time."""
     httpd = ThreadingHTTPServer((host, port), Handler)
     httpd.store = store
@@ -472,14 +515,20 @@ def make_server(host, port, store, scheduler, auth, events, site_dir=None) -> Th
     httpd.events = events
     httpd.limiter = LoginLimiter()
     httpd.site_dir = Path(site_dir if site_dir is not None else settings.SITE_DIR)
+    httpd.summaries = summaries
+    httpd.models = models
     return httpd
 
 
-def start_cleanup(store, events=None, interval=3600):
-    """Every `interval` seconds on a daemon thread: remove expired jobs and prune old log lines."""
+def start_cleanup(store, events=None, interval=3600, stop=None):
+    """Every `interval` seconds on a daemon thread: remove expired jobs and prune old log lines.
+
+    Setting the optional `stop` event ends the loop (tests use it; the server never stops it).
+    """
+    stop = stop or threading.Event()
 
     def loop():
-        while True:
+        while not stop.is_set():
             now = time.time()
             try:
                 store.cleanup(now)
@@ -490,7 +539,7 @@ def start_cleanup(store, events=None, interval=3600):
                     events.prune(now)
                 except Exception as e:  # noqa: BLE001 - pruning must keep running
                     print(f"[cleanup] log prune failed: {e!r}", file=sys.stderr, flush=True)
-            time.sleep(interval)
+            stop.wait(interval)
 
     thread = threading.Thread(target=loop, name="cleanup", daemon=True)
     thread.start()

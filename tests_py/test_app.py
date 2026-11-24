@@ -13,9 +13,12 @@ from server import app as app_mod
 from server import scheduler as sched_mod
 from server.app import make_server, start_cleanup
 from server.auth import Auth
+from server.llm import LLMUnavailable
+from server.models import ModelCatalog
 from server.scheduler import Scheduler
 from server.stats import EventLog
 from server.store import JobStore
+from server.summary_worker import SummaryWorker
 
 
 class FakeEngine:
@@ -86,12 +89,44 @@ class Client:
 
 @pytest.fixture
 def env(tmp_path):
+    yield from serve_env(tmp_path, llm=False)
+
+
+@pytest.fixture
+def env_llm(tmp_path):
+    yield from serve_env(tmp_path, llm=True)
+
+
+class FakeModelsLLM:
+    def list_models(self):
+        return ["model-a", "model-b"]
+
+
+@pytest.fixture
+def env_models(tmp_path):
+    yield from serve_env(tmp_path, llm=False, models=ModelCatalog(FakeModelsLLM(), "model-a"))
+
+
+class DownModelsLLM:
+    def list_models(self):
+        raise LLMUnavailable("down")
+
+
+@pytest.fixture
+def env_models_down(tmp_path):
+    yield from serve_env(tmp_path, llm=False, models=ModelCatalog(DownModelsLLM(), "model-a"))
+
+
+def serve_env(tmp_path, llm, models=None):
     data = tmp_path / "data"
     site = tmp_path / "site"
     (site / "js").mkdir(parents=True)
     (site / "index.html").write_text("<!doctype html><title>home</title>", encoding="utf-8")
     (site / "login.html").write_text("<!doctype html><title>login</title>", encoding="utf-8")
     (site / "js" / "app.js").write_text("console.log(1);", encoding="utf-8")
+    (site / "css").mkdir()
+    (site / "css" / "theme.css").write_text(":root { --bg: #fff; }", encoding="utf-8")
+    (site / "js" / "theme.js").write_text("self.Theme = {};", encoding="utf-8")
     (tmp_path / "requirements.txt").write_text("outside the site dir", encoding="utf-8")
 
     store = JobStore(data)
@@ -101,7 +136,10 @@ def env(tmp_path):
     sched = Scheduler(store, events, engine_factory=FakeEngine, workers=2)
     sched.start()
     wait_until_alive(sched)
-    httpd = make_server("127.0.0.1", 0, store, sched, auth, events, site_dir=site)
+    # The worker is built but never started: tests drive summary records directly.
+    summaries = SummaryWorker(store, None, "test-model", url="http://llm.test/v1") if llm else None
+    httpd = make_server("127.0.0.1", 0, store, sched, auth, events, site_dir=site, summaries=summaries,
+                        models=models)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     yield SimpleNamespace(
@@ -222,6 +260,25 @@ def test_login_page_is_public_and_static_serves_with_session(env):
     r = user.request("GET", "/")
     assert r.status == 200
     assert b"home" in r.body
+
+
+def test_webp_served_as_image_webp_to_logged_in_user(env):
+    (env.tmp / "site" / "img").mkdir()
+    (env.tmp / "site" / "img" / "hero.webp").write_bytes(b"RIFF\x00\x00\x00\x00WEBPVP8 ")
+    user = logged_in(env)
+    r = user.request("GET", "/img/hero.webp")
+    assert r.status == 200
+    assert r.header("Content-Type") == "image/webp"
+
+
+def test_theme_assets_public(env):
+    anon = env.client.fresh()
+    r = anon.request("GET", "/css/theme.css")
+    assert r.status == 200
+    assert r.header("Content-Type").startswith("text/css")
+    r = anon.request("GET", "/js/theme.js")
+    assert r.status == 200
+    assert r.header("Content-Type").startswith("application/javascript")
 
 
 def test_static_path_traversal_404(env):
@@ -481,13 +538,17 @@ def test_bad_create_body_400(env):
 
 def test_cleanup_removes_expired_jobs(env):
     job = env.store.create("u1", "old.pdf", 10, now=0)
-    start_cleanup(env.store, interval=0.05)
-
-    deadline = time.monotonic() + 10
-    while time.monotonic() < deadline and env.store.get(job["id"]) is not None:
-        time.sleep(0.02)
-
-    assert env.store.get(job["id"]) is None
+    stop = threading.Event()
+    thread = start_cleanup(env.store, interval=0.05, stop=stop)
+    try:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and env.store.get(job["id"]) is not None:
+            time.sleep(0.02)
+        assert env.store.get(job["id"]) is None
+    finally:
+        stop.set()
+        thread.join(5)
+    assert not thread.is_alive()
 
 
 # ----- login limiter (item 1) -------------------------------------------------
@@ -745,3 +806,249 @@ def test_health_503_when_no_engine_ever_loads(env, monkeypatch):
         httpd.server_close()
         thread.join()
         sched.stop()
+
+
+# ----- AI summary API ---------------------------------------------------------
+
+SUMMARY_OFF_MSG = "ไม่ได้เปิดใช้การสรุปด้วย AI"
+
+
+def done_job(client, env):
+    data = pdf_bytes(env.tmp)
+    job_id, chunk_size = create_job(client, len(data))
+    upload_all(client, job_id, data, chunk_size)
+    r = client.request("POST", f"/api/jobs/{job_id}/finish")
+    assert r.status == 200, r.body
+    wait_state(client, job_id, "done")
+    return job_id
+
+
+def write_summary(env, job_id, state, **fields):
+    record = {"state": state, "updated_at": 1.0, "attempts": 0, "waits": 0, "next_try_at": 0,
+              "error": None, "progress": None, "model": "test-model", "result": None}
+    record.update(fields)
+    assert env.store.write_summary(job_id, record)
+
+
+def test_summary_state_in_job_list_when_enabled(env_llm):
+    user = logged_in(env_llm)
+    job_id = done_job(user, env_llm)
+    write_summary(env_llm, job_id, "done", result={"title": "t"})
+
+    jobs = user.request("GET", "/api/jobs").json()
+    assert [j["summary_state"] for j in jobs if j["id"] == job_id] == ["done"]
+
+
+def test_summary_state_null_when_enabled_but_no_record(env_llm):
+    user = logged_in(env_llm)
+    job_id = done_job(user, env_llm)
+
+    assert user.request("GET", f"/api/jobs/{job_id}").json()["summary_state"] is None
+    assert user.request("GET", f"/api/jobs/{job_id}/summary").json() == {"enabled": True, "state": None}
+
+
+def test_no_summary_state_when_disabled(env):
+    user = logged_in(env)
+    job_id = done_job(user, env)
+
+    assert "summary_state" not in user.request("GET", f"/api/jobs/{job_id}").json()
+    r = user.request("GET", f"/api/jobs/{job_id}/summary")
+    assert r.status == 200
+    assert r.json() == {"enabled": False}
+
+
+def test_get_summary_visible_to_other_session(env_llm):
+    owner = logged_in(env_llm)
+    job_id = done_job(owner, env_llm)
+    write_summary(env_llm, job_id, "done", result={"title": "t"})
+
+    r = logged_in(env_llm).request("GET", f"/api/jobs/{job_id}/summary")
+    assert r.status == 200
+    body = r.json()
+    assert body["enabled"] is True
+    assert body["state"] == "done"
+    assert body["result"] == {"title": "t"}
+
+
+def test_post_summary_conflict_while_pending(env_llm):
+    user = logged_in(env_llm)
+    job_id = done_job(user, env_llm)
+    write_summary(env_llm, job_id, "pending")
+
+    assert user.request("POST", f"/api/jobs/{job_id}/summary").status == 409
+
+
+def test_post_summary_by_non_owner_allowed(env_llm):
+    owner = logged_in(env_llm)
+    job_id = done_job(owner, env_llm)
+    write_summary(env_llm, job_id, "done", result={"title": "t"})
+
+    r = logged_in(env_llm).request("POST", f"/api/jobs/{job_id}/summary")
+    assert r.status == 202
+    assert r.json()["state"] == "pending"
+
+
+def test_post_summary_disabled_503(env):
+    user = logged_in(env)
+    job_id = done_job(user, env)
+
+    r = user.request("POST", f"/api/jobs/{job_id}/summary")
+    assert r.status == 503
+    assert r.json() == {"error": SUMMARY_OFF_MSG}
+
+
+def test_get_summary_unknown_job_404(env_llm):
+    user = logged_in(env_llm)
+    assert user.request("GET", "/api/jobs/does-not-exist/summary").status == 404
+
+
+def test_post_summary_unknown_job_404(env_llm):
+    user = logged_in(env_llm)
+    assert user.request("POST", "/api/jobs/does-not-exist/summary").status == 404
+
+
+def test_summary_routes_need_login(env_llm):
+    assert env_llm.client.fresh().request("GET", "/api/jobs/x/summary").status == 401
+    assert env_llm.client.fresh().request("POST", "/api/jobs/x/summary").status == 401
+
+
+# ----- model choice (per job) -------------------------------------------------
+
+MODEL_INVALID_MSG = "โมเดลนี้ใช้ไม่ได้"
+
+
+def test_models_requires_login(env_models):
+    assert env_models.client.fresh().request("GET", "/api/models").status == 401
+
+
+def test_models_lists_catalog_with_default(env_models):
+    user = logged_in(env_models)
+
+    r = user.request("GET", "/api/models")
+
+    assert r.status == 200
+    assert r.json() == {
+        "models": [{"id": "model-a", "name": "model-a"}, {"id": "model-b", "name": "model-b"}],
+        "default": "model-a",
+    }
+
+
+def test_models_empty_when_no_catalog(env):
+    r = logged_in(env).request("GET", "/api/models")
+
+    assert r.status == 200
+    assert r.json() == {"models": [], "default": None}
+
+
+def test_create_job_with_allowed_model_stores_it(env_models):
+    user = logged_in(env_models)
+
+    r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-b"})
+    job_id = r.json()["job"]["id"]
+
+    assert r.status == 201
+    assert r.json()["job"]["model"] == "model-b"
+    assert user.request("GET", f"/api/jobs/{job_id}").json()["model"] == "model-b"
+
+
+def test_create_job_with_disallowed_model_is_400_and_creates_nothing(env_models):
+    user = logged_in(env_models)
+
+    for bad in ["no-such-model", 123, "", ["x"]]:
+        r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": bad})
+        assert r.status == 400, bad
+        assert r.json() == {"error": MODEL_INVALID_MSG}
+    assert env_models.store.list(None) == []
+
+
+def test_create_job_with_any_model_is_400_without_catalog(env):
+    r = logged_in(env).request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-a"})
+
+    assert r.status == 400
+    assert r.json() == {"error": MODEL_INVALID_MSG}
+    assert env.store.list(None) == []
+
+
+def test_create_job_without_model_has_no_model_key(env_models):
+    user = logged_in(env_models)
+
+    job_id = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10}).json()["job"]["id"]
+    null_id = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": None}).json()["job"]["id"]
+
+    assert "model" not in user.request("GET", f"/api/jobs/{job_id}").json()
+    assert "model" not in user.request("GET", f"/api/jobs/{null_id}").json()
+
+
+def test_job_creation_with_api_down_allows_only_the_default(env_models_down):
+    user = logged_in(env_models_down)
+
+    ok = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-a"})
+    other = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-b"})
+
+    assert ok.status == 201
+    assert other.status == 400
+    assert other.json() == {"error": MODEL_INVALID_MSG}
+
+
+class KeyedModelsLLM:
+    """Lists `ids` for the key it stands for."""
+
+    def __init__(self, ids):
+        self.ids = ids
+
+    def list_models(self):
+        return list(self.ids)
+
+
+@pytest.fixture
+def env_two_keys(tmp_path):
+    catalog = ModelCatalog(KeyedModelsLLM(["model-a", "model-b"]), "model-a",
+                           others={"2": KeyedModelsLLM(["model-c"])})
+    yield from serve_env(tmp_path, llm=False, models=catalog)
+
+
+def test_models_endpoint_has_no_key_field_and_lists_key_two_ids(env_two_keys):
+    r = logged_in(env_two_keys).request("GET", "/api/models")
+
+    assert r.json()["models"] == [
+        {"id": "model-a", "name": "model-a"},
+        {"id": "model-b", "name": "model-b"},
+        {"id": "model-c", "name": "model-c"},
+    ]
+
+
+def test_create_job_with_model_only_key_two_lists_is_201_without_llm_key(env_two_keys):
+    user = logged_in(env_two_keys)
+
+    r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-c"})
+
+    assert r.status == 201
+    job_id = r.json()["job"]["id"]
+    assert env_two_keys.store.get(job_id)["model"] == "model-c"
+    assert "llm_key" not in env_two_keys.store.get(job_id)
+
+
+def test_create_job_ignores_a_stale_key_field(env_two_keys):
+    user = logged_in(env_two_keys)
+
+    r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-c", "key": "2"})
+
+    assert r.status == 201
+    job_id = r.json()["job"]["id"]
+    assert env_two_keys.store.get(job_id)["model"] == "model-c"
+    assert "llm_key" not in env_two_keys.store.get(job_id)
+
+
+@pytest.mark.parametrize("body", [
+    {"model": "no-such-model"},
+    {"model": "no-such-model", "key": "2"},
+    {"model": ""},
+])
+def test_create_job_with_unlisted_model_is_400(env_two_keys, body):
+    user = logged_in(env_two_keys)
+
+    r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, **body})
+
+    assert r.status == 400
+    assert r.json() == {"error": MODEL_INVALID_MSG}
+    assert env_two_keys.store.list(None) == []

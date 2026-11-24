@@ -1,0 +1,401 @@
+import threading
+import time
+
+import pytest
+
+from server.llm import FailoverLLM, LLMError, LLMUnavailable
+from server.store import JobError
+from server.summary_worker import SummaryWorker
+
+PAGE_TEXT = "ก" * 320  # above the 300-character short-document threshold
+
+
+def canned(name):
+    if name == "chunk_notes":
+        return {"summary": "s", "key_points": [], "parties": [], "dates": [], "amounts": []}
+    if name == "document_summary":
+        return {"doc_type": "D", "title": "T", "summary": "s",
+                "key_points": [], "parties": [], "dates": [], "amounts": []}
+    raise AssertionError(f"unexpected call {name}")
+
+
+class FakeLLM:
+    """Answers with canned notes, or raises `error` on every call. `on_call` runs first."""
+
+    def __init__(self, error=None, on_call=None):
+        self.error = error
+        self.on_call = on_call
+        self.calls = 0
+
+    def complete(self, prompt, schema, name, max_tokens):
+        self.calls += 1
+        if self.on_call is not None:
+            self.on_call()
+        if self.error is not None:
+            raise self.error
+        return canned(name)
+
+
+def make_done_job(store, pages_text, finished_at, model=None):
+    job = store.create("u1", "doc.pdf", 10, now=0, model=model)
+    job_id = job["id"]
+    store.set_state(job_id, "done", pages=len(pages_text), finished_at=finished_at)
+    for i, t in enumerate(pages_text, 1):
+        line = {"text": t, "confidence": 0.99, "box": []}
+        store.write_page(job_id, i, {"number": i, "text": t, "lines": [line]}, None)
+    return job_id
+
+
+class ModelFakeLLM:
+    """Like FakeLLM, but records the model of every call and every with_model request."""
+
+    def __init__(self, model="test-model", log=None):
+        self.model = model
+        self.log = log if log is not None else []
+        self.with_model_calls = []
+
+    def with_model(self, model):
+        self.with_model_calls.append(model)
+        return ModelFakeLLM(model, log=self.log)
+
+    def complete(self, prompt, schema, name, max_tokens):
+        self.log.append(self.model)
+        return canned(name)
+
+
+@pytest.fixture
+def make_worker(store):
+    created = []
+
+    def factory(llm=None, poll_seconds=5, now=time.time):
+        worker = SummaryWorker(store, llm or FakeLLM(), model="test-model", now=now,
+                               poll_seconds=poll_seconds, url="http://llm.test")
+        created.append(worker)
+        return worker
+
+    yield factory
+    for worker in created:
+        worker.stop()
+
+
+def test_scan_backfills_done_jobs_only(store, make_worker):
+    done = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    failed = make_done_job(store, [PAGE_TEXT], finished_at=2.0)
+    store.set_state(failed, "failed", finished_at=2.0)
+    cancelled = make_done_job(store, [PAGE_TEXT], finished_at=3.0)
+    store.set_state(cancelled, "cancelled", finished_at=3.0)
+
+    make_worker().scan(now=10.0)
+
+    assert store.read_summary(done)["state"] == "pending"
+    assert store.read_summary(failed) is None
+    assert store.read_summary(cancelled) is None
+
+
+def test_step_summarizes_oldest_first(store, make_worker):
+    newer = make_done_job(store, [PAGE_TEXT], finished_at=200.0)
+    older = make_done_job(store, [PAGE_TEXT], finished_at=100.0)
+    worker = make_worker()
+
+    assert worker.step(now=1000.0) is True
+
+    assert store.read_summary(older)["state"] == "done"
+    assert store.read_summary(older)["result"]["title"] == "T"
+    assert store.read_summary(newer)["state"] == "pending"
+
+
+def test_short_document_marked_short(store, make_worker):
+    job_id = make_done_job(store, ["ก" * 100], finished_at=1.0)
+
+    make_worker().step(now=10.0)
+
+    assert store.read_summary(job_id)["state"] == "short"
+
+
+def test_unavailable_never_fails(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    llm = FakeLLM(error=LLMUnavailable("down"))
+    worker = make_worker(llm=llm)
+    now = 100.0
+
+    for _ in range(10):
+        worker.step(now)
+        record = store.read_summary(job_id)
+        assert record["state"] == "pending"
+        assert record["attempts"] == 0
+        assert record["next_try_at"] - now <= 300 + 1  # delay counts from the end of the run
+        now = record["next_try_at"] + 1
+
+    llm.error = None
+    assert worker.step(now) is True
+    assert store.read_summary(job_id)["state"] == "done"
+
+
+def test_bad_output_fails_after_three_attempts(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    worker = make_worker(llm=FakeLLM(error=LLMError("bad")))
+    now = 100.0
+
+    states = []
+    for _ in range(3):
+        worker.step(now)
+        record = store.read_summary(job_id)
+        states.append(record["state"])
+        now = record["next_try_at"] + 1
+
+    assert states == ["pending", "pending", "failed"]
+    assert record["attempts"] == 3
+    assert "bad" in record["error"]
+
+
+def test_recover_running_to_pending(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    store.write_summary(job_id, {"state": "running", "updated_at": 1.0, "attempts": 0, "next_try_at": 0,
+                                 "error": None, "progress": [0, 1], "model": "m", "result": None, "waits": 0})
+
+    make_worker().recover()
+
+    assert store.read_summary(job_id)["state"] == "pending"
+
+
+def test_job_deleted_mid_run(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    llm = FakeLLM(on_call=lambda: store.delete(job_id))
+
+    make_worker(llm=llm).step(now=10.0)
+
+    assert not (store.root / "jobs" / job_id).exists()
+
+
+def test_regenerate_conflicts_and_resets(store, make_worker):
+    worker = make_worker()
+    pending = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    worker.scan(now=1.0)
+    with pytest.raises(JobError) as exc:
+        worker.regenerate(pending, now=2.0)
+    assert exc.value.status == 409
+    assert exc.value.message == "กำลังสรุปอยู่"
+
+    done = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    store.write_summary(done, {"state": "done", "updated_at": 1.0, "attempts": 2, "next_try_at": 0,
+                               "error": None, "progress": None, "model": "m", "result": {"title": "T"}, "waits": 0})
+    record = worker.regenerate(done, now=5.0)
+    assert record["state"] == "pending"
+    assert record["attempts"] == 0
+    assert store.read_summary(done)["state"] == "pending"
+
+    running_ocr = store.create("u1", "ocr.pdf", 10, now=0)["id"]
+    store.set_state(running_ocr, "running")
+    with pytest.raises(JobError) as exc:
+        worker.regenerate(running_ocr, now=5.0)
+    assert exc.value.status == 409
+    assert exc.value.message == "งานยังอ่านไม่เสร็จ"
+
+
+def test_status_counts_all_states(store, make_worker):
+    make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    worker = make_worker()
+    worker.scan(now=1.0)
+
+    status = worker.status()
+
+    assert status["enabled"] is True
+    assert status["url"] == "http://llm.test"
+    assert status["model"] == "test-model"
+    assert status["counts"] == {"pending": 1, "running": 0, "done": 0, "failed": 0, "short": 0}
+
+
+def test_thread_start_stop(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    worker = make_worker()
+    worker.start()
+
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline and (store.read_summary(job_id) or {}).get("state") != "done":
+        time.sleep(0.02)
+    assert store.read_summary(job_id)["state"] == "done"
+
+    worker.stop()
+    assert not any(t.name == "summary-worker" and t.is_alive() for t in threading.enumerate())
+
+
+def test_final_write_failure_repends(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    real_write = store.write_summary
+
+    def fail_on_done(job, data):
+        if data["state"] == "done":
+            raise OSError("disk full")
+        return real_write(job, data)
+
+    store.write_summary = fail_on_done
+    assert make_worker().step(now=10.0) is True
+
+    record = store.read_summary(job_id)
+    assert record["state"] == "pending"
+    assert record["next_try_at"] > 10.0
+
+
+def test_page_read_error_repends(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+
+    def broken_read(job, number):
+        raise OSError("unreadable page")
+
+    store.read_page = broken_read
+    assert make_worker().step(now=10.0) is True
+
+    assert store.read_summary(job_id)["state"] == "pending"
+
+
+def test_persistent_final_write_failure_fails_after_three(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    real_write = store.write_summary
+
+    def fail_on_done(job, data):
+        if data["state"] == "done":
+            raise OSError("disk full")
+        return real_write(job, data)
+
+    store.write_summary = fail_on_done
+    worker = make_worker()
+    now = 10.0
+    for _ in range(3):
+        worker.step(now)
+        now = (store.read_summary(job_id)["next_try_at"] or now) + 1
+
+    record = store.read_summary(job_id)
+    assert record["state"] == "failed"
+    assert record["attempts"] == 3
+    assert "disk full" in record["error"]
+
+
+def test_stop_returns_within_bound_while_llm_call_blocks(store, make_worker):
+    # A stuck LLM call (up to 600 s in production) must not hold up shutdown.
+    entered = threading.Event()
+    release = threading.Event()
+
+    def block():
+        entered.set()
+        release.wait(60)
+
+    make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    worker = make_worker(llm=FakeLLM(on_call=block))
+    worker.start()
+    try:
+        assert entered.wait(10), "worker never reached the LLM call"
+
+        stopper = threading.Thread(target=worker.stop, daemon=True)
+        began = time.monotonic()
+        stopper.start()
+        stopper.join(15)
+        elapsed = time.monotonic() - began
+
+        assert not stopper.is_alive(), "stop() blocked on the in-flight LLM call"
+        assert elapsed < 6.5
+    finally:
+        release.set()
+
+
+def test_scan_keeps_summary_it_cannot_read(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    store.write_summary(job_id, {"state": "done", "updated_at": 1.0, "attempts": 0, "waits": 0,
+                                 "next_try_at": 0, "error": None, "progress": None,
+                                 "model": "m", "result": {"title": "kept"}})
+    real_read = store.read_summary
+    store.read_summary = lambda j: None  # unreadable, not missing
+    make_worker().scan(now=10.0)
+    store.read_summary = real_read
+    assert store.read_summary(job_id)["result"] == {"title": "kept"}
+
+
+def test_running_write_has_no_page_count_progress(store, make_worker):
+    job_id = make_done_job(store, [PAGE_TEXT] * 3, finished_at=1.0)
+    seen = []
+    llm = FakeLLM(on_call=lambda: seen.append(store.read_summary(job_id)["progress"]))
+    make_worker(llm=llm).step(now=10.0)
+    # Before any chunk finishes the counter is unknown, never [0, pages].
+    assert seen[0] is None
+
+
+def test_retry_delay_counts_from_end_of_long_run(store, make_worker, monkeypatch):
+    from server import summary_worker as sw
+
+    clock = [1000.0]
+    monkeypatch.setattr(sw.time, "monotonic", lambda: clock[0])
+
+    def slow_failure():
+        clock[0] += 900  # the call took 15 minutes
+
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    make_worker(llm=FakeLLM(error=LLMError("bad"), on_call=slow_failure)).step(now=10.0)
+    record = store.read_summary(job_id)
+    assert record["next_try_at"] >= 10.0 + 900 + sw.RETRY_STEP_SECONDS
+    assert record["updated_at"] >= 10.0 + 900
+
+
+def test_summarize_gets_real_page_count(store, make_worker, monkeypatch):
+    from server import summary_worker as sw
+
+    job_id = make_done_job(store, [PAGE_TEXT] * 3, finished_at=1.0)
+    (store.jobs_dir / job_id / "pages" / "2.json").unlink()
+    got = {}
+
+    def fake_summarize(llm, pages, filename, on_progress=None, page_count=None):
+        got["count"] = page_count
+        raise sw.summarizer.ShortText()
+
+    monkeypatch.setattr(sw.summarizer, "summarize", fake_summarize)
+    make_worker().step(now=10.0)
+    assert got["count"] == 3
+
+
+def test_job_model_is_used_and_recorded_on_every_record(store, make_worker):
+    llm = ModelFakeLLM()
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0, model="other")
+    worker = make_worker(llm)
+
+    worker.step(now=10.0)
+
+    assert llm.with_model_calls == ["other"]
+    assert set(llm.log) == {"other"}
+    record = store.read_summary(job_id)
+    assert record["state"] == "done"
+    assert record["model"] == "other"
+    assert worker.status()["model"] == "test-model"
+
+
+def test_job_without_model_uses_default_and_does_not_clone(store, make_worker):
+    llm = ModelFakeLLM()
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    worker = make_worker(llm)
+
+    worker.step(now=10.0)
+
+    assert llm.with_model_calls == []
+    assert set(llm.log) == {"test-model"}
+    assert store.read_summary(job_id)["model"] == "test-model"
+
+
+class FailingModelLLM(ModelFakeLLM):
+    """Records every call, then fails it like a server that rejects the key."""
+
+    def complete(self, prompt, schema, name, max_tokens):
+        self.log.append(self.model)
+        raise LLMError("HTTP 401 from LLM server: invalid key ***")
+
+
+def test_failover_summarizes_with_key_two_when_key_one_fails(store, make_worker):
+    first = FailingModelLLM()
+    second = ModelFakeLLM()
+    job_id = make_done_job(store, [PAGE_TEXT], finished_at=1.0)
+    worker = make_worker(FailoverLLM([first, second]))
+
+    worker.step(now=10.0)
+
+    assert first.log == ["test-model"] * len(first.log) and first.log
+    assert set(second.log) == {"test-model"}
+    record = store.read_summary(job_id)
+    assert record["state"] == "done"
+    assert record["model"] == "test-model"
+    assert "llm_key" not in record

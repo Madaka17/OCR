@@ -1,5 +1,5 @@
 // Copies the browser runtime and models into site/ for the static Space.
-// Run with `npm run build`. Sources come from node_modules and OpenThai2.0-OCR-Text/.
+// Run with `npm run build`. Sources come from node_modules and OpenThai2.1-OCR-Text/.
 import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = join(ROOT, "site");
 const NM = join(ROOT, "node_modules");
-const MODELS = join(ROOT, "OpenThai2.0-OCR-Text");
+const MODELS = join(ROOT, "OpenThai2.1-OCR-Text");
 
 const VENDOR = [
   [join(NM, "@techstark", "opencv-js", "dist", "opencv.js"), "opencv.js"],

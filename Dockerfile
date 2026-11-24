@@ -7,6 +7,6 @@ COPY --chown=user requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=user web_app.py .
 COPY --chown=user web ./web
-COPY --chown=user OpenThai2.0-OCR-Text ./OpenThai2.0-OCR-Text
+COPY --chown=user OpenThai2.1-OCR-Text ./OpenThai2.1-OCR-Text
 EXPOSE 7860
 CMD ["python", "web_app.py"]

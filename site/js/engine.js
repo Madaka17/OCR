@@ -1,6 +1,6 @@
 "use strict";
 // Port of the detector, crop and line-splitting half of
-// OpenThai2.0-OCR-Text/runtime/line_engine.py: LineOCR.detect, DEFAULTS,
+// OpenThai2.0-OCR-Text v2.0.0 runtime/line_engine.py (not yet ported: v2.1 changes): LineOCR.detect, DEFAULTS,
 // _mini_box, _box_score, _unclip, crop_line (turn=0), _flatten, split_one.
 // Recognition, page reading and read() (orientation, deskew, the line filter).
 // Python's word positions, dropped list and timing are not ported.

@@ -13,9 +13,12 @@ import sys
 from server import settings
 from server.app import make_server, start_cleanup
 from server.auth import Auth
+from server.llm import FailoverLLM, LLMClient
+from server.models import ModelCatalog
 from server.scheduler import Scheduler
 from server.stats import EventLog
 from server.store import JobStore
+from server.summary_worker import SummaryWorker
 
 
 def config_path():
@@ -47,6 +50,33 @@ def ask_password(label: str) -> str | None:
     return first if first and first == second else None
 
 
+def make_summaries(store):
+    """The AI summary worker, or None when OCR_LLM_URL is empty. Built but not started."""
+    if not settings.LLM_URL:
+        print("AI summary: off", flush=True)
+        return None
+    key_note = " (API key set)" if settings.LLM_API_KEY else ""
+    print(f"AI summary: {settings.LLM_MODEL} at {settings.LLM_URL}{key_note}", flush=True)
+
+    def client(api_key: str) -> LLMClient:
+        return LLMClient(
+            settings.LLM_URL,
+            settings.LLM_MODEL,
+            api_key=api_key,
+            reasoning_effort=settings.LLM_REASONING_EFFORT or None,
+        )
+
+    clients = {"1": client(settings.LLM_API_KEY)}
+    if settings.LLM_API_KEY_2:
+        clients["2"] = client(settings.LLM_API_KEY_2)
+        print("AI summary: second API key set", flush=True)
+    # Key 1 is always tried first; key 2 is used only for a call that key 1 fails.
+    llm = FailoverLLM(list(clients.values())) if len(clients) > 1 else clients["1"]
+    worker = SummaryWorker(store, llm, settings.LLM_MODEL, url=settings.LLM_URL)
+    worker.clients = clients  # the raw per-key clients, for the model catalog
+    return worker
+
+
 def serve() -> int:
     auth = Auth(config_path())
     if not auth.ready():
@@ -61,9 +91,17 @@ def serve() -> int:
     scheduler = Scheduler(store, events, engine_factory=load_engine, workers=settings.WORKERS)
     scheduler.start()
     start_cleanup(store, events=events)
-    httpd = make_server(settings.HOST, settings.PORT, store, scheduler, auth, events)
+    summaries = make_summaries(store)
+    models = None
+    if summaries is not None:
+        others = {name: c for name, c in summaries.clients.items() if name != "1"}
+        models = ModelCatalog(summaries.clients["1"], settings.LLM_MODEL, others=others or None)
+    httpd = make_server(settings.HOST, settings.PORT, store, scheduler, auth, events,
+                        summaries=summaries, models=models)
     host, port = httpd.server_address[:2]
     print(f"Listening on http://{host}:{port}", flush=True)
+    if summaries is not None:
+        summaries.start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
@@ -71,6 +109,8 @@ def serve() -> int:
     finally:
         httpd.server_close()
         scheduler.stop()
+        if summaries is not None:
+            summaries.stop()
     return 0
 
 

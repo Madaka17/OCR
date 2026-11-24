@@ -1,6 +1,6 @@
 "use strict";
 // Port of the pure box-geometry and reading-order helpers in
-// OpenThai2.0-OCR-Text/runtime/line_engine.py (no OpenCV, no ONNX).
+// OpenThai2.0-OCR-Text v2.0.0 runtime/line_engine.py (not yet ported: v2.1 changes; no OpenCV, no ONNX).
 var Layout = (function () {
   function getThaiText() {
     if (typeof module !== "undefined" && module.exports) return require("./thai_text.js");

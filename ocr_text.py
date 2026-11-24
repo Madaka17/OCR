@@ -1,4 +1,4 @@
-"""Read Thai and English text from pictures and PDFs with OpenThai 2.0 OCR Text.
+"""Read Thai and English text from pictures and PDFs with OpenThai 2.1 OCR Text.
 
 Usage: python ocr_text.py document.pdf [more files ...]
 Prints the text and saves it next to each file as <file>.txt.
@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-MODEL_DIR = Path(__file__).resolve().parent / "OpenThai2.0-OCR-Text"
+MODEL_DIR = Path(__file__).resolve().parent / "OpenThai2.1-OCR-Text"
 sys.path.insert(0, str(MODEL_DIR))
 from runtime.line_engine import LineOCR  # noqa: E402
 
