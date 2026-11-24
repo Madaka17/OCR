@@ -161,7 +161,8 @@ function startCard(hero, attr) {
 test("index.html: empty-state hero with two start cards", () => {
   const html = read("index.html");
   const hero = block(html, null, '<div id="empty-state"', '<div id="status"');
-  assert.match(hero, /<svg class="hero-sparkle" width="40" height="40"/, "40px sparkle svg");
+  assert.match(hero, /<img class="hero-sparkle" src="img\/hero\.webp" width="96" height="96" alt=""/, "hero photo");
+  assert.ok(fs.existsSync(path.join(SITE, "img", "hero.webp")), "site/img/hero.webp exists");
   assert.match(hero, /<h2 class="empty-heading">อ่านข้อความจากรูปหรือ PDF<\/h2>/, "hero heading");
   assert.match(hero, /<p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF<\/p>/, "hero sub line");
   assert.equal((hero.match(/class="start-card"/g) || []).length, 2, "two start cards");
@@ -292,13 +293,13 @@ test("index.html: model-select rules use theme tokens only", () => {
   }
 });
 
-test("index.html: model options carry key|id values and the key is sent only when it is not 1", () => {
+test("index.html: option values are plain model ids; the key is never sent", () => {
   const html = read("index.html");
   const script = html.slice(html.lastIndexOf("<script>"));
-  assert.match(script, /opt\.value = m\.key \+ "\|" \+ m\.id;/, "option value is key|id");
+  assert.match(script, /opt\.value = m\.id;/, "option value is the plain model id");
+  assert.match(script, /opt\.textContent = m\.name;/, "text is the short name");
   assert.match(script, /opt\.title = m\.id;/, "title is the model id");
-  assert.match(script, /"1\|" \+ data\.default/, "old default is key 1");
-  assert.match(script, /saved\.indexOf\("\|"\) < 0/, "saved value without | is treated as key 1");
-  assert.match(script, /body\.model = modelSelect\.value\.slice\(sep \+ 1\);/, "model id is sent in the body");
-  assert.match(script, /if \(key !== "1"\) body\.key = key;/, "key sent only when it is not 1");
+  assert.doesNotMatch(script, /m\.key/, "no key field in the option list");
+  assert.doesNotMatch(script, /body\.key/, "the upload body never carries a key");
+  assert.match(script, /lastIndexOf\("\|"\)/, "a saved key|id value is read after its last |");
 });

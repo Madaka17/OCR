@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 
 from server import settings
-from server.llm import LLMClient, LLMError, LLMUnavailable
+from server.llm import FailoverLLM, LLMClient, LLMError, LLMUnavailable
 
 SCHEMA = {"type": "object", "properties": {"a": {"type": "integer"}}}
 
@@ -286,3 +286,128 @@ def test_with_model_keeps_url_key_and_settings():
     assert other.api_key == "k"
     assert other.reasoning_effort == "low"
     assert client.model == "m"
+
+
+class _Fake:
+    """A client stand-in. complete answers `reply` or raises `error`; list_models answers
+    `models` or raises `models_error`. Every complete call appends its model to `log`."""
+
+    def __init__(self, reply=None, error=None, models=None, models_error=None, model="m", log=None):
+        self.reply = reply
+        self.error = error
+        self.models = models
+        self.models_error = models_error
+        self.model = model
+        self.log = log if log is not None else []
+        self.calls = 0
+
+    def complete(self, prompt, schema, name, max_tokens):
+        self.calls += 1
+        self.log.append(self.model)
+        if self.error is not None:
+            raise self.error
+        return self.reply
+
+    def list_models(self):
+        if self.models_error is not None:
+            raise self.models_error
+        return list(self.models)
+
+    def with_model(self, model):
+        return _Fake(reply=self.reply, error=self.error, models=self.models,
+                     models_error=self.models_error, model=model, log=self.log)
+
+
+def test_failover_first_client_success_never_calls_second():
+    first = _Fake(reply={"a": 1})
+    second = _Fake(reply={"a": 2})
+
+    assert FailoverLLM([first, second]).complete("hi", SCHEMA, "thing", 50) == {"a": 1}
+    assert second.calls == 0
+
+
+def test_failover_llm_error_uses_second_and_logs_without_key(capsys):
+    fake_key = "fake-key-one-123"
+    first = _Fake(error=LLMError("HTTP 401 from LLM server: invalid key ***"))
+    second = _Fake(reply={"a": 2})
+
+    assert FailoverLLM([first, second]).complete("hi", SCHEMA, "thing", 50) == {"a": 2}
+
+    err = capsys.readouterr().err
+    assert "[llm] key 1 failed, trying key 2: HTTP 401 from LLM server: invalid key ***" in err
+    assert fake_key not in err
+
+
+def test_failover_logs_clipped_error_text(capsys):
+    first = _Fake(error=LLMError("x" * 500))
+    second = _Fake(reply={"a": 2})
+
+    FailoverLLM([first, second]).complete("hi", SCHEMA, "thing", 50)
+
+    line = capsys.readouterr().err.splitlines()[0]
+    assert line == "[llm] key 1 failed, trying key 2: " + "x" * 200
+
+
+def test_failover_both_unavailable_raises_last_unavailable():
+    first = _Fake(error=LLMUnavailable("down 1"))
+    second = _Fake(error=LLMUnavailable("down 2"))
+
+    with pytest.raises(LLMUnavailable, match="down 2"):
+        FailoverLLM([first, second]).complete("hi", SCHEMA, "thing", 50)
+
+
+def test_failover_unavailable_then_llm_error_raises_llm_error():
+    first = _Fake(error=LLMUnavailable("down"))
+    second = _Fake(error=LLMError("HTTP 400 bad"))
+
+    with pytest.raises(LLMError, match="HTTP 400 bad") as info:
+        FailoverLLM([first, second]).complete("hi", SCHEMA, "thing", 50)
+    assert not isinstance(info.value, LLMUnavailable)
+
+
+def test_failover_llm_error_then_unavailable_raises_the_llm_error():
+    first = _Fake(error=LLMError("HTTP 400 bad"))
+    second = _Fake(error=LLMUnavailable("down"))
+
+    with pytest.raises(LLMError, match="HTTP 400 bad") as info:
+        FailoverLLM([first, second]).complete("hi", SCHEMA, "thing", 50)
+    assert not isinstance(info.value, LLMUnavailable)
+
+
+def test_failover_model_is_the_first_clients_model():
+    assert FailoverLLM([_Fake(model="a1"), _Fake(model="b1")]).model == "a1"
+
+
+def test_failover_with_model_applies_to_every_client():
+    log = []
+    first = _Fake(error=LLMError("bad"), log=log)
+    second = _Fake(reply={"a": 2}, log=log)
+
+    other = FailoverLLM([first, second]).with_model("x")
+
+    assert isinstance(other, FailoverLLM)
+    assert other.model == "x"
+    assert other.complete("hi", SCHEMA, "thing", 50) == {"a": 2}
+    assert log == ["x", "x"]
+
+
+def test_failover_list_models_is_union_without_duplicates():
+    first = _Fake(models=["x", "y"])
+    second = _Fake(models=["y", "z"])
+
+    assert FailoverLLM([first, second]).list_models() == ["x", "y", "z"]
+
+
+def test_failover_list_models_skips_a_failing_client():
+    first = _Fake(models_error=LLMUnavailable("down"))
+    second = _Fake(models=["z"])
+
+    assert FailoverLLM([first, second]).list_models() == ["z"]
+
+
+def test_failover_list_models_raises_when_every_client_fails():
+    first = _Fake(models_error=LLMUnavailable("down 1"))
+    second = _Fake(models_error=LLMUnavailable("down 2"))
+
+    with pytest.raises(LLMUnavailable, match="down 2"):
+        FailoverLLM([first, second]).list_models()

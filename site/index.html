@@ -500,7 +500,7 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent), var(--shadow);
   }
-  .hero-sparkle { display: block; width: 40px; height: 40px; color: var(--primary); }
+  .hero-sparkle { display: block; width: 96px; height: 96px; margin: 0 auto; border-radius: 50%; object-fit: cover; object-position: 50% 35%; border: 3px solid var(--card); box-shadow: 0 0 0 2px var(--primary); }
   .start-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -907,7 +907,7 @@
         </section>
 
         <div id="empty-state" class="card empty-card">
-          <svg class="hero-sparkle" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.5 4.9 2.6 7 7.5 7.5-4.9.5-7 2.6-7.5 7.5-.5-4.9-2.6-7-7.5-7.5 4.9-.5 7-2.6 7.5-7.5Z" fill="currentColor"/></svg>
+          <img class="hero-sparkle" src="img/hero.webp" width="96" height="96" alt="" decoding="async">
           <h2 class="empty-heading">อ่านข้อความจากรูปหรือ PDF</h2>
           <p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF</p>
           <p class="empty-sub">ไฟล์ละไม่เกิน 500 MB</p>
@@ -1896,19 +1896,19 @@
     modelSelect.textContent = "";
     models.forEach(function (m) {
       var opt = document.createElement("option");
-      opt.value = m.key + "|" + m.id;
+      opt.value = m.id;
       opt.textContent = m.name;
       opt.title = m.id;
       modelSelect.appendChild(opt);
     });
-    // Option values are "key|id". A saved value from before keys existed matches no option and falls back to the default.
-    var values = models.map(function (m) { return m.key + "|" + m.id; });
-    var defaultValue = "1|" + data.default;
+    // Option values are plain model ids. A value saved before the key was dropped reads "key|id":
+    // only the part after its last "|" is the id. Anything that matches no option falls back to the default.
+    var values = models.map(function (m) { return m.id; });
     var saved = null;
     try { saved = localStorage.getItem("ocr-model"); } catch (err) {}
-    if (saved && saved.indexOf("|") < 0) saved = "1|" + saved;
+    if (saved) saved = saved.slice(saved.lastIndexOf("|") + 1);
     if (values.indexOf(saved) >= 0) modelSelect.value = saved;
-    else if (values.indexOf(defaultValue) >= 0) modelSelect.value = defaultValue;
+    else if (values.indexOf(data.default) >= 0) modelSelect.value = data.default;
     else modelSelect.value = values[0];
     modelSelect.hidden = false;
     modelSelect.addEventListener("change", function () {
@@ -1920,10 +1920,7 @@
     statusText.textContent = "กำลังเริ่มอัปโหลด " + name + " …";
     var body = { filename: name, size: file.size };
     if (!modelSelect.hidden) {
-      var sep = modelSelect.value.indexOf("|");
-      var key = modelSelect.value.slice(0, sep);
-      body.model = modelSelect.value.slice(sep + 1);
-      if (key !== "1") body.key = key;
+      body.model = modelSelect.value;
     }
     var created = await api("POST", "/api/jobs", body);
     var jobId = created.job.id;

@@ -1,5 +1,6 @@
 import http.client
 import json
+import sys
 import urllib.parse
 import urllib.request
 
@@ -130,3 +131,44 @@ class LLMClient:
             return raw
         finally:
             conn.close()
+
+
+class FailoverLLM:
+    """Tries each client in order and returns the first answer. Only LLMError is a failure to move past."""
+
+    def __init__(self, clients: list):
+        self.clients = list(clients)
+
+    @property
+    def model(self) -> str:
+        return self.clients[0].model
+
+    def complete(self, prompt: str, schema: dict, name: str, max_tokens: int) -> dict:
+        errors = []
+        for index, client in enumerate(self.clients, 1):
+            try:
+                return client.complete(prompt, schema, name, max_tokens)
+            except LLMError as exc:
+                errors.append(exc)
+                if index < len(self.clients):
+                    print(f"[llm] key {index} failed, trying key {index + 1}: {str(exc)[:200]}",
+                          file=sys.stderr, flush=True)
+        if all(isinstance(exc, LLMUnavailable) for exc in errors):
+            raise errors[-1]
+        raise next(exc for exc in reversed(errors) if not isinstance(exc, LLMUnavailable))
+
+    def with_model(self, model: str) -> "FailoverLLM":
+        return FailoverLLM([client.with_model(model) for client in self.clients])
+
+    def list_models(self) -> list[str]:
+        """The union of every client's model ids, in order, without duplicates."""
+        ids: list[str] = []
+        errors: list[Exception] = []
+        for client in self.clients:
+            try:
+                ids.extend(client.list_models())
+            except Exception as exc:
+                errors.append(exc)
+        if errors and len(errors) == len(self.clients):
+            raise errors[-1]
+        return list(dict.fromkeys(ids))

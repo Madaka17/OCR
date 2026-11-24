@@ -262,6 +262,15 @@ def test_login_page_is_public_and_static_serves_with_session(env):
     assert b"home" in r.body
 
 
+def test_webp_served_as_image_webp_to_logged_in_user(env):
+    (env.tmp / "site" / "img").mkdir()
+    (env.tmp / "site" / "img" / "hero.webp").write_bytes(b"RIFF\x00\x00\x00\x00WEBPVP8 ")
+    user = logged_in(env)
+    r = user.request("GET", "/img/hero.webp")
+    assert r.status == 200
+    assert r.header("Content-Type") == "image/webp"
+
+
 def test_theme_assets_public(env):
     anon = env.client.fresh()
     r = anon.request("GET", "/css/theme.css")
@@ -919,7 +928,7 @@ def test_models_lists_catalog_with_default(env_models):
 
     assert r.status == 200
     assert r.json() == {
-        "models": [{"id": "model-a", "name": "model-a", "key": "1"}, {"id": "model-b", "name": "model-b", "key": "1"}],
+        "models": [{"id": "model-a", "name": "model-a"}, {"id": "model-b", "name": "model-b"}],
         "default": "model-a",
     }
 
@@ -998,32 +1007,44 @@ def env_two_keys(tmp_path):
     yield from serve_env(tmp_path, llm=False, models=catalog)
 
 
-def test_create_job_with_key_two_and_its_model_stores_key(env_two_keys):
+def test_models_endpoint_has_no_key_field_and_lists_key_two_ids(env_two_keys):
+    r = logged_in(env_two_keys).request("GET", "/api/models")
+
+    assert r.json()["models"] == [
+        {"id": "model-a", "name": "model-a"},
+        {"id": "model-b", "name": "model-b"},
+        {"id": "model-c", "name": "model-c"},
+    ]
+
+
+def test_create_job_with_model_only_key_two_lists_is_201_without_llm_key(env_two_keys):
+    user = logged_in(env_two_keys)
+
+    r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-c"})
+
+    assert r.status == 201
+    job_id = r.json()["job"]["id"]
+    assert env_two_keys.store.get(job_id)["model"] == "model-c"
+    assert "llm_key" not in env_two_keys.store.get(job_id)
+
+
+def test_create_job_ignores_a_stale_key_field(env_two_keys):
     user = logged_in(env_two_keys)
 
     r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-c", "key": "2"})
 
     assert r.status == 201
     job_id = r.json()["job"]["id"]
-    assert env_two_keys.store.get(job_id)["llm_key"] == "2"
     assert env_two_keys.store.get(job_id)["model"] == "model-c"
-
-
-def test_create_job_with_key_two_default_is_allowed(env_two_keys):
-    r = logged_in(env_two_keys).request("POST", "/api/jobs",
-                                        {"filename": "a.pdf", "size": 10, "model": "model-a", "key": "2"})
-
-    assert r.status == 201
+    assert "llm_key" not in env_two_keys.store.get(job_id)
 
 
 @pytest.mark.parametrize("body", [
-    {"model": "model-c", "key": "3"},
-    {"model": "model-c", "key": 2},
-    {"key": "2"},
-    {"model": None, "key": "2"},
-    {"model": "model-b", "key": "2"},
+    {"model": "no-such-model"},
+    {"model": "no-such-model", "key": "2"},
+    {"model": ""},
 ])
-def test_create_job_with_bad_key_or_pair_is_400(env_two_keys, body):
+def test_create_job_with_unlisted_model_is_400(env_two_keys, body):
     user = logged_in(env_two_keys)
 
     r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, **body})
@@ -1031,21 +1052,3 @@ def test_create_job_with_bad_key_or_pair_is_400(env_two_keys, body):
     assert r.status == 400
     assert r.json() == {"error": MODEL_INVALID_MSG}
     assert env_two_keys.store.list(None) == []
-
-
-def test_create_job_with_key_one_or_null_has_no_llm_key(env_two_keys):
-    user = logged_in(env_two_keys)
-
-    one = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-a", "key": "1"})
-    nul = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-a", "key": None})
-
-    assert one.status == 201 and nul.status == 201
-    assert "llm_key" not in env_two_keys.store.get(one.json()["job"]["id"])
-    assert "llm_key" not in env_two_keys.store.get(nul.json()["job"]["id"])
-
-
-def test_create_job_without_key_has_no_llm_key(env_two_keys):
-    r = logged_in(env_two_keys).request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-a"})
-
-    assert r.status == 201
-    assert "llm_key" not in env_two_keys.store.get(r.json()["job"]["id"])
