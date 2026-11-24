@@ -61,3 +61,34 @@ test("login.html: blue login markup contract", () => {
   assert.match(html, /<button[^>]*data-theme-toggle[^>]*aria-label="เปลี่ยนเป็นโหมดมืด"[^>]*aria-pressed="false"/, "theme toggle button");
   assert.match(html, /class="streak"[^>]*aria-hidden="true"/, "decorative streaks are aria-hidden");
 });
+
+test("index.html: sidebar shell contract", () => {
+  const html = read("index.html");
+  const body = html.slice(html.indexOf("<body"));
+  // Header: drawer toggle, doc title, new-job button, search inside the header.
+  assert.match(body, /<header class="app-header"[\s\S]*?<\/header>/, "app-header present");
+  assert.match(body, /<button[^>]*id="menu-btn"[^>]*aria-label="เมนู"[^>]*aria-expanded="false"/, "menu button with aria-expanded");
+  assert.match(body, /id="doc-title"[^>]*>\s*งานใหม่\s*</, "doc title defaults to งานใหม่");
+  assert.match(body, /<button[^>]*id="new-job-btn"[^>]*>\s*งานใหม่\s*</, "new job button");
+  assert.match(body, /<div class="drawer-overlay"[^>]*hidden/, "drawer overlay starts hidden");
+  // Content and composer regions.
+  assert.match(body, /<main class="main">/, "main region");
+  assert.match(body, /<div class="content">/, "content region");
+  assert.match(body, /<footer class="composer">[\s\S]*?<div id="dropzone"[\s\S]*?<\/footer>/, "dropzone is inside the composer footer");
+  assert.doesNotMatch(body, /class="page-header"/, "page header removed");
+  assert.doesNotMatch(body, /class="crumbs"/, "breadcrumbs removed");
+  // Sidebar navigation.
+  for (const label of ["หน้าแรก", "งานของฉัน", "ส่งออก"]) {
+    assert.match(body, new RegExp(`<button[^>]*class="nav-item[^"]*"[^>]*>[\\s\\S]*?${label}`), `nav item ${label}`);
+  }
+  assert.doesNotMatch(body, /ย่อเมนู/, "no desktop collapse button");
+  assert.match(body, /<h3 class="side-title">ผลลัพธ์<\/h3>/, "ผลลัพธ์ sidebar section");
+  assert.match(body, /<a[^>]*id="admin-link"[^>]*href="\/admin"[^>]*hidden/, "admin link hidden by default");
+  assert.match(body, /<button[^>]*data-theme-toggle[^>]*aria-label="เปลี่ยนเป็นโหมดมืด"/, "theme toggle in the sidebar");
+  assert.match(body, /<aside[^>]*id="sidebar"/, "sidebar has an id for the drawer");
+  // Drawer, theme tokens and the result hook.
+  assert.match(html, /\.logo-bg \{ fill: var\(--primary\)/, "logo background uses --primary");
+  assert.match(html, /body\.result-open/, "result-open rules exist");
+  assert.match(html, /function setResultOpen\(open\)/, "setResultOpen defined");
+  assert.match(html, /@media \(max-width: 768px\)/, "drawer breakpoint is 768px");
+});
