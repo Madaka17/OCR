@@ -1,3 +1,5 @@
+import pytest
+
 from server.llm import LLMError, LLMUnavailable
 from server.models import ModelCatalog, short_name
 
@@ -23,6 +25,19 @@ def test_short_name_strips_provider_and_quantization():
     assert short_name("gpt-4o") == "gpt-4o"
     assert short_name("org/sub/Llama-3-8B-GGUF") == "Llama-3-8B"
     assert short_name("m-q4_k_m") == "m"
+
+
+@pytest.mark.parametrize("model_id, expected", [
+    ("a/b-mxfp4", "b"),
+    ("x-awq", "x"),
+    ("x-gptq", "x"),
+    ("x-mlx", "x"),
+    ("x-exl2", "x"),
+    ("foo-fp3", "foo-fp3"),
+    ("a-gguf-awq", "a-gguf"),
+])
+def test_short_name_strips_one_known_suffix(model_id, expected):
+    assert short_name(model_id) == expected
 
 
 def test_default_is_first_even_when_api_lists_it_later():
@@ -73,6 +88,32 @@ def test_api_error_without_good_fetch_returns_only_default():
     catalog = ModelCatalog(llm, "unsloth/qwen3.5-4b")
 
     assert catalog.list() == [{"id": "unsloth/qwen3.5-4b", "name": "qwen3.5-4b"}]
+
+
+def test_failed_refresh_is_retried_after_a_minute():
+    clock = {"t": 1000.0}
+    llm = FakeModelsLLM(error=LLMUnavailable("down"))
+    catalog = ModelCatalog(llm, "d", ttl=600, now=lambda: clock["t"])
+    catalog.list()
+    assert llm.calls == 1
+
+    clock["t"] = 1030.0
+    catalog.list()
+    assert llm.calls == 1
+
+    clock["t"] = 1061.0
+    llm.error = None
+    llm.ids = ["x"]
+    assert [m["id"] for m in catalog.list()] == ["d", "x"]
+    assert llm.calls == 2
+
+
+def test_unexpected_error_falls_back_like_api_error():
+    class Broken:
+        def list_models(self):
+            raise RuntimeError("bug")
+
+    assert ModelCatalog(Broken(), "d").list() == [{"id": "d", "name": "d"}]
 
 
 def test_allowed_only_for_listed_ids():

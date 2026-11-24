@@ -4,20 +4,17 @@ import re
 import threading
 import time
 
-from server.llm import LLMError
-
 # Quantization and packaging suffixes that people do not need to see in a name.
-_SUFFIX_RE = re.compile(r"-(?:gguf|nvfp4|(?:q|int|fp|bf)\d\w*)$", re.IGNORECASE)
+_SUFFIX_RE = re.compile(
+    r"-(?:nvfp4|mxfp4|fp4|fp8|fp16|bf16|int4|int8|awq|gptq|gguf|mlx|exl2|q[0-9][0-9a-z_]*)$",
+    re.IGNORECASE,
+)
+RETRY_SECONDS = 60  # a failed refresh is retried this soon, not after the full ttl
 
 
 def short_name(model_id: str) -> str:
-    """A readable name: the last path part, without quantization or GGUF suffixes."""
-    name = model_id.rsplit("/", 1)[-1]
-    while True:
-        stripped = _SUFFIX_RE.sub("", name)
-        if stripped == name:
-            return name
-        name = stripped
+    """A readable name: the last path part, without one trailing quantization or GGUF suffix."""
+    return _SUFFIX_RE.sub("", model_id.rsplit("/", 1)[-1])
 
 
 class ModelCatalog:
@@ -34,7 +31,7 @@ class ModelCatalog:
         self._now = now
         self._mu = threading.Lock()
         self._ids: list[str] | None = None  # the last good list, default first
-        self._fetched_at: float | None = None
+        self._next_refresh: float | None = None
 
     @property
     def default(self) -> str:
@@ -47,13 +44,12 @@ class ModelCatalog:
     def _current(self) -> list[str]:
         with self._mu:
             now = self._now()
-            if self._fetched_at is not None and now - self._fetched_at < self.ttl:
-                return self._ids if self._ids is not None else [self._default]
-            self._fetched_at = now
-            try:
-                self._ids = self._with_default_first(self.llm.list_models())
-            except LLMError:
-                pass  # keep the last good list, or fall back to the default alone
+            if self._next_refresh is None or now >= self._next_refresh:
+                try:
+                    self._ids = self._with_default_first(self.llm.list_models())
+                    self._next_refresh = now + self.ttl
+                except Exception:  # noqa: BLE001 - the catalog must keep serving whatever happens
+                    self._next_refresh = now + RETRY_SECONDS
             return self._ids if self._ids is not None else [self._default]
 
     def list(self) -> list[dict]:

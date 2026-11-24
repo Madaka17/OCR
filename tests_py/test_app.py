@@ -13,6 +13,7 @@ from server import app as app_mod
 from server import scheduler as sched_mod
 from server.app import make_server, start_cleanup
 from server.auth import Auth
+from server.llm import LLMUnavailable
 from server.models import ModelCatalog
 from server.scheduler import Scheduler
 from server.stats import EventLog
@@ -104,6 +105,16 @@ class FakeModelsLLM:
 @pytest.fixture
 def env_models(tmp_path):
     yield from serve_env(tmp_path, llm=False, models=ModelCatalog(FakeModelsLLM(), "model-a"))
+
+
+class DownModelsLLM:
+    def list_models(self):
+        raise LLMUnavailable("down")
+
+
+@pytest.fixture
+def env_models_down(tmp_path):
+    yield from serve_env(tmp_path, llm=False, models=ModelCatalog(DownModelsLLM(), "model-a"))
 
 
 def serve_env(tmp_path, llm, models=None):
@@ -957,3 +968,14 @@ def test_create_job_without_model_has_no_model_key(env_models):
 
     assert "model" not in user.request("GET", f"/api/jobs/{job_id}").json()
     assert "model" not in user.request("GET", f"/api/jobs/{null_id}").json()
+
+
+def test_job_creation_with_api_down_allows_only_the_default(env_models_down):
+    user = logged_in(env_models_down)
+
+    ok = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-a"})
+    other = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-b"})
+
+    assert ok.status == 201
+    assert other.status == 400
+    assert other.json() == {"error": MODEL_INVALID_MSG}
