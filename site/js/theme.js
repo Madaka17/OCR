@@ -54,7 +54,8 @@
     const label = t === "dark" ? LABEL_TO_LIGHT : LABEL_TO_DARK;
     for (const button of doc.querySelectorAll("[data-theme-toggle]")) {
       button.setAttribute("aria-label", label);
-      button.setAttribute("aria-pressed", String(t === "dark"));
+      // The label carries the state; aria-pressed would contradict it.
+      button.removeAttribute("aria-pressed");
     }
   }
 

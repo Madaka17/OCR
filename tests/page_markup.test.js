@@ -58,7 +58,8 @@ test("login.html: blue login markup contract", () => {
   assert.match(html, /<h1[^>]*>\s*เข้าสู่ระบบ\s*<\/h1>/, "visually hidden h1 heading");
   assert.match(html, /<label[^>]*for="password"[^>]*>\s*รหัสผ่าน\s*<\/label>/, "password label");
   assert.match(html, /ลืมรหัสผ่าน ติดต่อผู้ดูแล/, "forgot-password hint copy");
-  assert.match(html, /<button[^>]*data-theme-toggle[^>]*aria-label="เปลี่ยนเป็นโหมดมืด"[^>]*aria-pressed="false"/, "theme toggle button");
+  assert.match(html, /<button[^>]*data-theme-toggle[^>]*aria-label="เปลี่ยนเป็นโหมดมืด"/, "theme toggle button");
+  assert.doesNotMatch(html, /data-theme-toggle[^>]*aria-pressed/, "theme toggle has no aria-pressed");
   assert.match(html, /class="streak"[^>]*aria-hidden="true"/, "decorative streaks are aria-hidden");
 });
 
@@ -104,8 +105,41 @@ test("index.html: drawer moves focus in after a layout flush, and jobs nav shows
   assert.match(css, /\.sidebar\.drawer-open \{[^}]*visibility: visible[^}]*transition: transform 0\.2s ease, visibility 0s/, "open: visibility switches on at once");
   assert.match(css, /\.sidebar, \.sidebar\.drawer-open \{ transition: none; \}/, "reduced motion disables the transition, open state too");
   const jobs = html.slice(html.indexOf('navJobs.addEventListener("click"'), html.indexOf('navExport.addEventListener("click"'));
-  assert.match(jobs, /jobs-list[\s\S]*children\.length/, "jobs card shown only when the list has items");
+  assert.match(jobs, /jobsOpen = true/, "jobs nav marks the jobs view open");
+  assert.match(jobs, /syncJobsCard\(\)/, "jobs nav syncs the card and empty message");
   assert.match(jobs, /scrollIntoView/, "scrolls to the top of the content");
+  const sync = html.slice(html.indexOf("function syncJobsCard()"), html.indexOf("function renderJobs(jobs)"));
+  assert.match(sync, /jobsEmpty\.hidden = !empty/, "empty message shown only while the list is empty");
+  assert.match(sync, /jobsCard\.hidden = empty && !jobsOpen/, "card stays visible in the jobs view even when empty");
+  const renderBody = html.slice(html.indexOf("function renderJobs(jobs)"), html.indexOf("function notifyCompletions"));
+  assert.match(renderBody, /syncJobsCard\(\)/, "poller re-renders through syncJobsCard");
+  assert.doesNotMatch(renderBody, /jobsCard\.hidden = jobRows\.size === 0/, "poller no longer hides the card on its own");
+  assert.match(html, /<p id="jobs-empty" class="muted jobs-empty" hidden>ยังไม่มีงาน<\/p>/, "empty message markup inside the jobs card");
+});
+
+test("index.html: home and new job bring the hero back after clearing a result", () => {
+  const html = read("index.html");
+  const home = block(html, null, 'navHome.addEventListener("click"', 'navJobs.addEventListener("click"');
+  assert.match(home, /clearResults\(\);/, "home clears the result");
+  assert.match(home, /if \(!busy\) emptyState\.hidden = false;/, "home un-hides the hero when no upload is running");
+  const fresh = block(html, null, 'newJobBtn.addEventListener("click"', "// The admin link");
+  assert.match(fresh, /clearResults\(\);/, "new job clears the result");
+  assert.match(fresh, /if \(!busy\) emptyState\.hidden = false;/, "new job un-hides the hero when no upload is running");
+});
+
+test("index.html: Ctrl K only takes over when a result is open", () => {
+  const html = read("index.html");
+  const handler = block(html, null, 'e.key.toLowerCase() === "k"', "ui.searchInput.select();");
+  const guard = handler.indexOf('classList.contains("result-open")');
+  const prevent = handler.indexOf("e.preventDefault()");
+  assert.ok(guard >= 0, "checks result-open");
+  assert.ok(guard < prevent, "returns before preventDefault when no result is open");
+  assert.match(handler, /if \(!document\.body\.classList\.contains\("result-open"\)\) return;/, "early return without a result");
+});
+
+test("index.html: no empty side-section left in the sidebar", () => {
+  const html = read("index.html");
+  assert.doesNotMatch(html, /<div class="side-section">\s*<\/div>/, "no empty side-section");
 });
 
 // ---- chat-style empty state and bottom upload bar ----

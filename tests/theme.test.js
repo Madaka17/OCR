@@ -76,26 +76,27 @@ test("readStored and writeStored never throw and round-trip", () => {
 
 test("toggle stores the new theme and updates toggle buttons", () => {
   const win = fakeWin({ stored: "light" });
-  const button = { attrs: {}, setAttribute(k, v) { this.attrs[k] = String(v); } };
+  const button = { attrs: {}, setAttribute(k, v) { this.attrs[k] = String(v); }, removeAttribute(k) { delete this.attrs[k]; } };
   win._buttons.push(button);
   Theme.init(win);
   Theme.toggle(win);
   assert.equal(win._data.get("ocr-theme"), "dark");
-  assert.equal(button.attrs["aria-pressed"], "true");
   assert.equal(button.attrs["aria-label"], "เปลี่ยนเป็นโหมดสว่าง");
+  assert.equal("aria-pressed" in button.attrs, false, "no aria-pressed: the label carries the state");
   Theme.toggle(win);
   assert.equal(win._data.get("ocr-theme"), "light");
-  assert.equal(button.attrs["aria-pressed"], "false");
   assert.equal(button.attrs["aria-label"], "เปลี่ยนเป็นโหมดมืด");
+  assert.equal("aria-pressed" in button.attrs, false, "no aria-pressed after switching back");
 });
 
 test("syncButtons updates a toggle rendered after init (stored dark)", () => {
   const win = fakeWin({ stored: "dark" });
   // init runs from <head>, before the page's toggle button is in the DOM.
   Theme.init(win);
-  const button = { attrs: {}, setAttribute(k, v) { this.attrs[k] = String(v); } };
+  // A stale aria-pressed from earlier markup is removed.
+  const button = { attrs: { "aria-pressed": "false" }, setAttribute(k, v) { this.attrs[k] = String(v); }, removeAttribute(k) { delete this.attrs[k]; } };
   win._buttons.push(button);
   Theme.syncButtons(win);
   assert.equal(button.attrs["aria-label"], "เปลี่ยนเป็นโหมดสว่าง");
-  assert.equal(button.attrs["aria-pressed"], "true");
+  assert.equal("aria-pressed" in button.attrs, false, "aria-pressed removed");
 });

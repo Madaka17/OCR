@@ -828,8 +828,6 @@
     </nav>
 
     <section id="panel-main" class="panel">
-      <div class="side-section">
-      </div>
 
       <div class="result-tools">
         <h3 class="side-title">ผลลัพธ์</h3>
@@ -881,7 +879,7 @@
     <div class="sidebar-bottom">
       <a id="admin-link" class="nav-item" href="/admin" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>ผู้ดูแลระบบ</span></a>
       <div class="foot-row">
-        <button type="button" class="theme-toggle" data-theme-toggle aria-label="เปลี่ยนเป็นโหมดมืด" aria-pressed="false">
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="เปลี่ยนเป็นโหมดมืด">
           <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
           <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
         </button>
@@ -917,6 +915,7 @@
             <span id="jobs-count" class="muted"></span>
           </div>
           <ul id="jobs-list" class="jobs-list"></ul>
+          <p id="jobs-empty" class="muted jobs-empty" hidden>ยังไม่มีงาน</p>
         </section>
 
         <div id="empty-state" class="card empty-card">
@@ -1793,6 +1792,8 @@
 
   document.addEventListener("keydown", function (e) {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && typeof e.key === "string" && e.key.toLowerCase() === "k") {
+      // Only a result has search; otherwise leave the browser's own Ctrl K alone.
+      if (!document.body.classList.contains("result-open")) return;
       e.preventDefault();
       ui.searchInput.focus();
       ui.searchInput.select();
@@ -1860,24 +1861,31 @@
 
   navHome.addEventListener("click", function () {
     clearResults();
+    if (!busy) emptyState.hidden = false;
+    jobsOpen = false;
+    syncJobsCard();
     showPanel(false);
     window.scrollTo(0, 0);
     closeDrawer();
   });
   navJobs.addEventListener("click", function () {
-    var card = document.getElementById("jobs-card");
-    var list = document.getElementById("jobs-list");
-    // Reveal the card only when there are jobs to show; an empty card stays hidden.
-    card.hidden = list.children.length === 0;
+    // The jobs view stays open even when empty, so the "ยังไม่มีงาน" line can show.
+    jobsOpen = true;
+    syncJobsCard();
     document.querySelector(".content").scrollIntoView({ block: "start" });
     closeDrawer();
   });
   navExport.addEventListener("click", function () {
+    jobsOpen = false;
+    syncJobsCard();
     showPanel(true);
     closeDrawer();
   });
   newJobBtn.addEventListener("click", function () {
     clearResults();
+    if (!busy) emptyState.hidden = false;
+    jobsOpen = false;
+    syncJobsCard();
     showPanel(false);
     window.scrollTo(0, 0);
   });
@@ -2052,6 +2060,8 @@
   var jobsCard = document.getElementById("jobs-card");
   var jobsList = document.getElementById("jobs-list");
   var jobsCount = document.getElementById("jobs-count");
+  var jobsEmpty = document.getElementById("jobs-empty");
+  var jobsOpen = false;      // the "งานของฉัน" view is showing, so the card stays even when empty
   var logoutBtn = document.getElementById("logout-btn");
   var jobRows = new Map();   // job id -> row record (see createJobRow)
   var knownStates = null;    // job id -> state at the previous poll; null before the first poll
@@ -2249,6 +2259,13 @@
     rec.delBtn.hidden = !job.mine;  // only the owner sees ลบ; a shared job is viewed, not removed
   }
 
+  // The card shows when there are jobs or the jobs view is open; the empty line shows only while the list is empty.
+  function syncJobsCard() {
+    var empty = jobRows.size === 0;
+    jobsEmpty.hidden = !empty;
+    jobsCard.hidden = empty && !jobsOpen;
+  }
+
   function renderJobs(jobs) {
     var seen = new Set();
     jobs.forEach(function (job) {
@@ -2268,7 +2285,7 @@
       }
     });
     jobsCount.textContent = jobRows.size + " งาน";
-    jobsCard.hidden = jobRows.size === 0;
+    syncJobsCard();
   }
 
   function notifyCompletions(jobs, nextStates) {
