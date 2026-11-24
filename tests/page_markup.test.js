@@ -52,3 +52,12 @@ for (const page of PAGES) {
     }
   });
 }
+
+test("login.html: blue login markup contract", () => {
+  const html = read("login.html");
+  assert.match(html, /<h1[^>]*>\s*เข้าสู่ระบบ\s*<\/h1>/, "visually hidden h1 heading");
+  assert.match(html, /<label[^>]*for="password"[^>]*>\s*รหัสผ่าน\s*<\/label>/, "password label");
+  assert.match(html, /ลืมรหัสผ่าน ติดต่อผู้ดูแล/, "forgot-password hint copy");
+  assert.match(html, /<button[^>]*data-theme-toggle[^>]*aria-label="เปลี่ยนเป็นโหมดมืด"[^>]*aria-pressed="false"/, "theme toggle button");
+  assert.match(html, /class="streak"[^>]*aria-hidden="true"/, "decorative streaks are aria-hidden");
+});
