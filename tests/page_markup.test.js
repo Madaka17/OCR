@@ -163,7 +163,7 @@ test("index.html: empty-state hero with two start cards", () => {
   const hero = block(html, null, '<div id="empty-state"', '<div id="status"');
   assert.match(hero, /<img class="hero-sparkle" src="img\/hero\.webp" width="96" height="96" alt=""/, "hero photo");
   assert.ok(fs.existsSync(path.join(SITE, "img", "hero.webp")), "site/img/hero.webp exists");
-  assert.match(hero, /<h2 class="empty-heading">อ่านข้อความจากรูปหรือ PDF<\/h2>/, "hero heading");
+  assert.match(hero, /<h2 class="empty-heading">มาแล้วจ้าาาา นายจ๋าาาาา<\/h2>/, "hero heading");
   assert.match(hero, /<p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF<\/p>/, "hero sub line");
   assert.equal((hero.match(/class="start-card"/g) || []).length, 2, "two start cards");
   assert.doesNotMatch(hero, /data-mode=/, "no data-mode card left in the hero");
