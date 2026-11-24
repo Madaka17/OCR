@@ -3,37 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="js/theme.js"></script>
 <title>เข้าสู่ระบบ · Thai OCR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/theme.css">
 <style>
-  /* Indigo dashboard: dark only. Same tokens as index.html. */
-  :root {
-    color-scheme: dark;
-    --bg: #0A0C13;
-    --panel: #0F121B;
-    --card: #141824;
-    --field: #191E2C;
-    --field-hover: #1E2435;
-    --border: #252B3C;
-    --hover-border: #343B52;
-    --text: #E8EAF3;
-    --text-2: #C3C7D6;
-    --muted: #8F96AD;
-    --accent: #8F8DFF;
-    --accent-strong: #5F5CE6;
-    --accent-soft: rgba(110,107,248,.14);
-    --accent-text: #FFFFFF;
-    --red: #f87171;
-    --red-fill: rgba(248, 113, 113, 0.2);
-    --radius: 14px;
-    --radius-lg: 20px;
-    --chip-radius: 999px;
-    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 30px -12px rgba(0, 0, 0, 0.6);
-    --font:"IBM Plex Sans Thai","Leelawadee UI","Segoe UI",Tahoma,sans-serif;
-  }
-
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; }
@@ -43,7 +19,7 @@
     align-items: center;
     justify-content: center;
     padding: 16px;
-    background: radial-gradient(80% 50% at 50% 0%, rgba(110,107,248,.10), transparent 70%), var(--bg);
+    background: radial-gradient(80% 50% at 50% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%), var(--bg);
     color: var(--text);
     font-family: var(--font);
     font-size: 15px;
@@ -99,7 +75,7 @@
     border-radius: 999px;
     border: 1px solid var(--accent-strong);
     background: var(--accent-strong);
-    color: #fff;
+    color: var(--accent-text);
     box-shadow: 0 8px 24px -10px var(--accent-strong);
     cursor: pointer;
     transition: filter .18s, box-shadow .18s;

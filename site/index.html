@@ -3,45 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="js/theme.js"></script>
 <title>Thai OCR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/theme.css">
 <style>
-  /* Indigo dashboard: dark only. Tokens are the single source of colour. */
-  :root {
-    color-scheme: dark;
-    --bg: #0A0C13;
-    --panel: #0F121B;
-    --card: #141824;
-    --field: #191E2C;
-    --field-hover: #1E2435;
-    --border: #252B3C;
-    --hover-border: #343B52;
-    --text: #E8EAF3;
-    --text-2: #C3C7D6;
-    --muted: #8F96AD;
-    --accent: #8F8DFF;
-    --accent-strong: #5F5CE6;
-    --accent-soft: rgba(110,107,248,.14);
-    --accent-text: #FFFFFF;
-    --green: #4ade80;
-    --amber: #f59e0b;
-    --red: #f87171;
-    --green-fill: rgba(74, 222, 128, 0.18);
-    --amber-fill: rgba(245, 158, 11, 0.2);
-    --red-fill: rgba(248, 113, 113, 0.2);
-    --match-fill: rgba(250, 204, 21, 0.28);
-    --match-strong: rgba(245, 158, 11, 0.6);
-    --radius: 14px;
-    --radius-lg: 20px;
-    --chip-radius: 999px;
-    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 30px -12px rgba(0, 0, 0, 0.6);
-    --nav-h: 56px;
-    --font:"IBM Plex Sans Thai","Leelawadee UI","Segoe UI",Tahoma,sans-serif;
-    --mono: ui-monospace, Consolas, "Cascadia Mono", monospace;
-  }
-
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; }
@@ -197,7 +165,7 @@
   }
   .tab.active {
     background: var(--accent-strong);
-    color: #fff;
+    color: var(--accent-text);
     font-weight: 600;
     box-shadow: 0 8px 24px -10px var(--accent-strong);
   }
@@ -358,12 +326,12 @@
   .btn-primary {
     background: var(--accent-strong);
     border-color: var(--accent-strong);
-    color: #fff;
+    color: var(--accent-text);
     font-weight: 600;
     padding-inline: 22px;
     box-shadow: 0 8px 24px -10px var(--accent-strong);
   }
-  .btn-primary:hover { border-color: var(--accent-strong); color: #fff; filter: brightness(1.08); }
+  .btn-primary:hover { border-color: var(--accent-strong); color: var(--accent-text); filter: brightness(1.08); }
   .btn-block { display: flex; width: 100%; margin-bottom: 8px; text-align: center; }
   .btn.icon-btn { padding: 4px 12px; font-size: 1.05rem; line-height: 1.2; min-height: 40px; }
   .filename {
@@ -409,7 +377,7 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--accent-text);
     transition: transform 0.15s;
   }
   .switch:checked { background: var(--accent-strong); }
@@ -437,14 +405,14 @@
     text-align: center;
     border: 1.5px solid var(--accent-strong);
     border-radius: var(--radius-lg);
-    background: radial-gradient(120% 60% at 50% 0%, rgba(110,107,248,.12), transparent 60%), var(--card);
-    box-shadow: 0 0 0 4px rgba(110, 107, 248, 0.08), var(--shadow);
+    background: radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%), var(--card);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 8%, transparent), var(--shadow);
     transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   }
   #empty-state.drag {
     border-style: dashed;
     border-color: var(--accent);
-    box-shadow: 0 0 0 6px rgba(110, 107, 248, 0.18), var(--shadow);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent), var(--shadow);
   }
   .drop-icon {
     width: 72px;
@@ -454,7 +422,7 @@
     place-items: center;
     background: var(--accent-soft);
     color: var(--accent);
-    border: 1px solid rgba(143, 141, 255, 0.22);
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
   }
   .empty-heading { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
   .empty-sub { color: var(--muted); font-size: 0.9rem; max-width: 40ch; }
@@ -524,9 +492,9 @@
   .box-mid { fill: var(--amber-fill); stroke: var(--amber); }
   .box-lo { fill: var(--red-fill); stroke: var(--red); }
   .box.active { stroke-width: 3px; }
-  .box-hi.active { fill: rgba(74, 222, 128, 0.42); }
-  .box-mid.active { fill: rgba(245, 158, 11, 0.42); }
-  .box-lo.active { fill: rgba(248, 113, 113, 0.44); }
+  .box-hi.active { fill: color-mix(in srgb, var(--green) 42%, transparent); }
+  .box-mid.active { fill: color-mix(in srgb, var(--amber) 42%, transparent); }
+  .box-lo.active { fill: color-mix(in srgb, var(--red) 44%, transparent); }
   .box.has-match { fill: var(--match-fill); stroke: var(--amber); }
   .box.has-match.active { fill: var(--match-strong); }
   .box.has-match.current { fill: var(--match-strong); stroke-width: 3px; }
@@ -536,7 +504,7 @@
     stroke-width: 2px;
     stroke-dasharray: 6 4;
     vector-effect: non-scaling-stroke;
-    filter: drop-shadow(0 0 1px #000);
+    filter: drop-shadow(0 0 1px var(--ink));
     transition: fill 0.1s, stroke-width 0.1s;
   }
   .field-empty { fill: var(--red-fill); stroke: var(--red); }

@@ -102,6 +102,9 @@ def serve_env(tmp_path, llm):
     (site / "index.html").write_text("<!doctype html><title>home</title>", encoding="utf-8")
     (site / "login.html").write_text("<!doctype html><title>login</title>", encoding="utf-8")
     (site / "js" / "app.js").write_text("console.log(1);", encoding="utf-8")
+    (site / "css").mkdir()
+    (site / "css" / "theme.css").write_text(":root { --bg: #fff; }", encoding="utf-8")
+    (site / "js" / "theme.js").write_text("self.Theme = {};", encoding="utf-8")
     (tmp_path / "requirements.txt").write_text("outside the site dir", encoding="utf-8")
 
     store = JobStore(data)
@@ -234,6 +237,16 @@ def test_login_page_is_public_and_static_serves_with_session(env):
     r = user.request("GET", "/")
     assert r.status == 200
     assert b"home" in r.body
+
+
+def test_theme_assets_public(env):
+    anon = env.client.fresh()
+    r = anon.request("GET", "/css/theme.css")
+    assert r.status == 200
+    assert r.header("Content-Type").startswith("text/css")
+    r = anon.request("GET", "/js/theme.js")
+    assert r.status == 200
+    assert r.header("Content-Type").startswith("application/javascript")
 
 
 def test_static_path_traversal_404(env):

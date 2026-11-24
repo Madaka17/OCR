@@ -26,7 +26,7 @@ MAX_JSON_BODY = 64 * 1024
 MAX_DRAIN_BYTES = 200 * 1024 * 1024
 DRAIN_CHUNK_BYTES = 64 * 1024
 DISK_HEADROOM_BYTES = 1024**3  # free space kept back on top of twice the upload size
-PUBLIC_STATIC = ("/login.html",)
+PUBLIC_STATIC = ("/login.html", "/css/theme.css", "/js/theme.js")
 ADMIN_PAGE_PATHS = ("/admin", "/admin.html")
 
 MSG_NOT_FOUND = "ไม่พบหน้านี้"

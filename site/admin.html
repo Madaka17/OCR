@@ -3,45 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="js/theme.js"></script>
 <title>ผู้ดูแลระบบ · Thai OCR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/theme.css">
 <style>
-  /* Indigo dashboard: dark only. Same tokens as index.html. */
-  :root {
-    color-scheme: dark;
-    --bg: #0A0C13;
-    --panel: #0F121B;
-    --card: #141824;
-    --field: #191E2C;
-    --field-hover: #1E2435;
-    --border: #252B3C;
-    --hover-border: #343B52;
-    --text: #E8EAF3;
-    --text-2: #C3C7D6;
-    --muted: #8F96AD;
-    --accent: #8F8DFF;
-    --accent-strong: #5F5CE6;
-    --accent-soft: rgba(110,107,248,.14);
-    --accent-text: #FFFFFF;
-    --green: #4ade80;
-    --amber: #f59e0b;
-    --red: #f87171;
-    --green-fill: rgba(74, 222, 128, 0.18);
-    --amber-fill: rgba(245, 158, 11, 0.2);
-    --red-fill: rgba(248, 113, 113, 0.2);
-    --match-fill: rgba(250, 204, 21, 0.28);
-    --match-strong: rgba(245, 158, 11, 0.6);
-    --radius: 14px;
-    --radius-lg: 20px;
-    --chip-radius: 999px;
-    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 30px -12px rgba(0, 0, 0, 0.6);
-    --nav-h: 56px;
-    --font:"IBM Plex Sans Thai","Leelawadee UI","Segoe UI",Tahoma,sans-serif;
-    --mono: ui-monospace, Consolas, "Cascadia Mono", monospace;
-  }
-
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; }
@@ -62,6 +30,17 @@
   h2 { font-size: 16px; margin: 0 0 12px; }
   a { color: var(--accent); }
   .status { color: var(--muted); font-size: 13px; }
+  .theme-toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; margin-left: 8px; vertical-align: middle;
+    padding: 0; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--card); color: var(--text-2); cursor: pointer;
+  }
+  .theme-toggle:hover { border-color: var(--hover-border); color: var(--text); }
+  .theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .theme-toggle .icon-sun { display: none; }
+  :root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+  :root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
   section {
     background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
     box-shadow: var(--shadow);
@@ -105,7 +84,11 @@
 <main>
   <header>
     <h1>ผู้ดูแลระบบ</h1>
-    <div><span class="status" id="status">กำลังโหลด…</span> · <a href="/">กลับหน้าหลัก</a></div>
+    <div><span class="status" id="status">กำลังโหลด…</span> · <a href="/">กลับหน้าหลัก</a>
+      <button type="button" class="theme-toggle" data-theme-toggle aria-label="เปลี่ยนเป็นโหมดมืด" aria-pressed="false">
+        <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </button></div>
   </header>
 
   <section>
