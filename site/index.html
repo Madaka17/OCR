@@ -3,45 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="js/theme.js"></script>
 <title>Thai OCR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/theme.css">
 <style>
-  /* Indigo dashboard: dark only. Tokens are the single source of colour. */
-  :root {
-    color-scheme: dark;
-    --bg: #0A0C13;
-    --panel: #0F121B;
-    --card: #141824;
-    --field: #191E2C;
-    --field-hover: #1E2435;
-    --border: #252B3C;
-    --hover-border: #343B52;
-    --text: #E8EAF3;
-    --text-2: #C3C7D6;
-    --muted: #8F96AD;
-    --accent: #8F8DFF;
-    --accent-strong: #5F5CE6;
-    --accent-soft: rgba(110,107,248,.14);
-    --accent-text: #FFFFFF;
-    --green: #4ade80;
-    --amber: #f59e0b;
-    --red: #f87171;
-    --green-fill: rgba(74, 222, 128, 0.18);
-    --amber-fill: rgba(245, 158, 11, 0.2);
-    --red-fill: rgba(248, 113, 113, 0.2);
-    --match-fill: rgba(250, 204, 21, 0.28);
-    --match-strong: rgba(245, 158, 11, 0.6);
-    --radius: 14px;
-    --radius-lg: 20px;
-    --chip-radius: 999px;
-    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 30px -12px rgba(0, 0, 0, 0.6);
-    --nav-h: 56px;
-    --font:"IBM Plex Sans Thai","Leelawadee UI","Segoe UI",Tahoma,sans-serif;
-    --mono: ui-monospace, Consolas, "Cascadia Mono", monospace;
-  }
-
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; }
@@ -73,25 +41,60 @@
     min-width: 0;
   }
 
-  /* ---- navbar (top bar of the main column) ---- */
+  /* ---- app header (top bar of the main column) ---- */
   .main-col { min-width: 0; }
-  .navbar {
+  .app-header {
     position: sticky;
     top: 0;
     z-index: 10;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px 16px;
+    gap: 10px 14px;
     min-height: var(--nav-h);
-    padding: 8px 16px;
+    padding: 8px 20px;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
   }
+  .doc-title {
+    font-weight: 600;
+    font-size: 0.98rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    max-width: 30ch;
+  }
+  body:not(.result-open) .search-wrap { display: none; }
+  .new-job-btn { flex: none; margin-left: auto; }
+  body:not(.result-open) .new-job-btn { display: none; }
+  .menu-btn {
+    display: none;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .menu-btn:hover { border-color: var(--hover-border); color: var(--text); }
+  .menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .composer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+    background: var(--bg);
+  }
+  .drawer-overlay { display: none; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; }
   .logo { flex: none; display: block; }
-  .logo-bg { fill: var(--accent-strong); }
+  .logo-bg { fill: var(--primary); }
   .logo-fg {
     fill: none;
     stroke: var(--accent-text);
@@ -164,44 +167,76 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
 
   /* ---- layout ---- */
-  .app { display: block; }
+  .app { display: grid; grid-template-columns: 248px minmax(0, 1fr); align-items: start; }
   .sidebar {
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    padding: 16px;
+    position: sticky;
+    top: 0;
+    width: 248px;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 16px 14px 20px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
     min-width: 0;
   }
   .sidebar > .brand { padding: 4px 6px 14px; }
-  .main { padding: 20px 16px 48px; min-width: 0; }
-
-  /* segmented pill control */
-  .tabs {
+  .main { min-width: 0; display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+  /* sidebar navigation */
+  .nav { display: grid; gap: 4px; }
+  .nav-item {
     display: flex;
-    gap: 4px;
-    padding: 4px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--field);
-    margin-bottom: 4px;
-  }
-  .tab {
-    flex: 1;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
     font: inherit;
-    font-size: 0.9rem;
-    padding: 7px 12px;
-    border: 0;
-    border-radius: 999px;
+    font-size: 0.92rem;
+    text-align: start;
+    text-decoration: none;
+    color: var(--text-2);
     background: transparent;
-    color: var(--muted);
+    border: 0;
+    border-radius: 10px;
     cursor: pointer;
   }
-  .tab.active {
-    background: var(--accent-strong);
-    color: #fff;
+  .nav-item svg { flex: none; }
+  .nav-item:hover { background: var(--field-hover); color: var(--text); }
+  .nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .nav-item[aria-current="page"] {
+    background: var(--accent-soft);
+    color: var(--text);
     font-weight: 600;
-    box-shadow: 0 8px 24px -10px var(--accent-strong);
+    box-shadow: inset 3px 0 0 var(--accent);
   }
-  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sidebar-bottom {
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .foot-row { display: flex; align-items: center; gap: 8px; }
+  .foot-row .nav-item { flex: 1; min-width: 0; }
+  .theme-toggle {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .theme-toggle:hover { border-color: var(--hover-border); color: var(--text); }
+  .theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .theme-toggle .icon-sun { display: none; }
+  :root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+  :root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+  .model-line { font-size: 0.82rem; }
   .side-section { padding: 16px 0; border-top: 1px solid var(--border); }
   .panel > .side-section:first-child { border-top: 0; }
   .side-title {
@@ -217,43 +252,48 @@
   }
   .conf-value { font-family: var(--mono); color: var(--accent); font-size: 0.85rem; }
 
-  /* ---- page header (main column) ---- */
-  .page-header {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding-bottom: 20px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid var(--border);
-  }
-  .crumbs {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    font-size: 0.85rem;
-    color: var(--muted);
-  }
-  .crumbs li { display: flex; align-items: center; gap: 8px; }
-  .crumbs li + li::before { content: "\203A"; opacity: 0.7; }
-  .crumbs svg { display: block; }
-  .crumbs [aria-current] { color: var(--accent); font-weight: 600; }
-  .page-header h1 {
-    font-size: clamp(22px, 2.6vw, 28px);
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    line-height: 1.3;
-    text-wrap: balance;
-  }
-  .page-sub { color: var(--muted); font-size: 0.92rem; }
+  /* ---- result tools (sidebar section, shown only with a result open) ---- */
+  .result-tools { display: none; margin-top: 8px; }
+  body.result-open .result-tools { display: block; }
+  .result-tools > .side-title { padding-top: 16px; }
 
-  /* ---- upload ---- */
-  .upload-btn { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; user-select: none; }
-  .upload-btn.drag { outline: 2px dashed var(--accent); outline-offset: 3px; }
-  .upload-btn.busy { opacity: 0.6; cursor: progress; pointer-events: none; }
+  /* ---- bottom upload bar (composer) ---- */
+  .composer-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 760px;
+    min-height: 56px;
+    margin: 0 auto;
+    padding: 8px 8px 8px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+  }
+  .composer-bar.drag { outline: 2px dashed var(--primary); outline-offset: 3px; }
+  .composer-bar.busy { opacity: 0.6; cursor: progress; pointer-events: none; }
+  .composer > .notice { max-width: 760px; margin: 0 auto 8px; }
+  .composer-hint { flex: 1 1 0; min-width: 0; color: var(--muted); font-size: 0.9rem; overflow-wrap: anywhere; }
+  .composer-bar .mode-select { max-width: 150px; min-height: 40px; }
+  .composer-add { flex: none; white-space: nowrap; }
+  .composer-send {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--primary);
+    color: var(--accent-text);
+    cursor: pointer;
+  }
+  .composer-send:hover { background: var(--primary-hover); }
+  .composer-send:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .composer-send:disabled { opacity: 0.5; cursor: progress; }
 
   .status {
     display: flex;
@@ -358,12 +398,12 @@
   .btn-primary {
     background: var(--accent-strong);
     border-color: var(--accent-strong);
-    color: #fff;
+    color: var(--accent-text);
     font-weight: 600;
     padding-inline: 22px;
     box-shadow: 0 8px 24px -10px var(--accent-strong);
   }
-  .btn-primary:hover { border-color: var(--accent-strong); color: #fff; filter: brightness(1.08); }
+  .btn-primary:hover { border-color: var(--accent-strong); color: var(--accent-text); filter: brightness(1.08); }
   .btn-block { display: flex; width: 100%; margin-bottom: 8px; text-align: center; }
   .btn.icon-btn { padding: 4px 12px; font-size: 1.05rem; line-height: 1.2; min-height: 40px; }
   .filename {
@@ -409,7 +449,7 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--accent-text);
     transition: transform 0.15s;
   }
   .switch:checked { background: var(--accent-strong); }
@@ -437,25 +477,47 @@
     text-align: center;
     border: 1.5px solid var(--accent-strong);
     border-radius: var(--radius-lg);
-    background: radial-gradient(120% 60% at 50% 0%, rgba(110,107,248,.12), transparent 60%), var(--card);
-    box-shadow: 0 0 0 4px rgba(110, 107, 248, 0.08), var(--shadow);
+    background: radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%), var(--card);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 8%, transparent), var(--shadow);
     transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   }
   #empty-state.drag {
     border-style: dashed;
     border-color: var(--accent);
-    box-shadow: 0 0 0 6px rgba(110, 107, 248, 0.18), var(--shadow);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent), var(--shadow);
   }
-  .drop-icon {
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
+  .hero-sparkle { display: block; width: 40px; height: 40px; color: var(--primary); }
+  .start-grid {
     display: grid;
-    place-items: center;
-    background: var(--accent-soft);
-    color: var(--accent);
-    border: 1px solid rgba(143, 141, 255, 0.22);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    width: 100%;
+    max-width: 720px;
+    margin-top: 8px;
   }
+  .start-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    min-height: 44px;
+    padding: 14px;
+    text-align: left;
+    font: inherit;
+    color: var(--text);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color 0.18s, background 0.18s;
+  }
+  .start-card:hover { border-color: var(--hover-border); background: var(--field); }
+  .start-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .start-icon { display: block; color: var(--primary); }
+  .start-title { font-weight: 600; font-size: 0.95rem; }
+  .start-sub { color: var(--muted); font-size: 0.82rem; }
+  @media (max-width: 899px) { .start-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 479px) { .start-grid { grid-template-columns: minmax(0, 1fr); } }
   .empty-heading { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
   .empty-sub { color: var(--muted); font-size: 0.9rem; max-width: 40ch; }
   .empty-title { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
@@ -524,9 +586,9 @@
   .box-mid { fill: var(--amber-fill); stroke: var(--amber); }
   .box-lo { fill: var(--red-fill); stroke: var(--red); }
   .box.active { stroke-width: 3px; }
-  .box-hi.active { fill: rgba(74, 222, 128, 0.42); }
-  .box-mid.active { fill: rgba(245, 158, 11, 0.42); }
-  .box-lo.active { fill: rgba(248, 113, 113, 0.44); }
+  .box-hi.active { fill: color-mix(in srgb, var(--green) 42%, transparent); }
+  .box-mid.active { fill: color-mix(in srgb, var(--amber) 42%, transparent); }
+  .box-lo.active { fill: color-mix(in srgb, var(--red) 44%, transparent); }
   .box.has-match { fill: var(--match-fill); stroke: var(--amber); }
   .box.has-match.active { fill: var(--match-strong); }
   .box.has-match.current { fill: var(--match-strong); stroke-width: 3px; }
@@ -536,7 +598,7 @@
     stroke-width: 2px;
     stroke-dasharray: 6 4;
     vector-effect: non-scaling-stroke;
-    filter: drop-shadow(0 0 1px #000);
+    filter: drop-shadow(0 0 1px var(--ink));
     transition: fill 0.1s, stroke-width 0.1s;
   }
   .field-empty { fill: var(--red-fill); stroke: var(--red); }
@@ -627,15 +689,6 @@
   .empty { color: var(--muted); padding: 10px 14px; }
 
   /* ---- server jobs (queue for large files, mode choice, my jobs) ---- */
-  .mode-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: 12px;
-    font-size: 0.88rem;
-    color: var(--muted);
-  }
   .mode-select {
     font: inherit;
     font-size: 0.88rem;
@@ -692,25 +745,43 @@
   .btn-link { text-decoration: none; display: inline-block; }
   @media (prefers-reduced-motion: reduce) { .job-fill { transition: none; } }
 
+  .content { min-width: 0; flex: 1; padding: 24px 24px 32px; }
+
   /* ---- responsive ---- */
-  @media (max-width: 899px) {
-    .search-wrap { order: 3; flex: 1 1 100%; max-width: none; margin: 0; }
-    .status-pill { order: 2; }
-  }
-  @media (min-width: 900px) {
-    .navbar { flex-wrap: nowrap; height: var(--nav-h); }
-    .app { display: grid; grid-template-columns: 300px minmax(0, 1fr); align-items: start; }
+  /* Drawer: the sidebar slides in over the page at 768px and narrower. */
+  @media (max-width: 768px) {
+    .app { display: block; }
     .sidebar {
-      position: sticky;
+      position: fixed;
       top: 0;
-      width: 300px;
+      left: 0;
+      bottom: 0;
+      z-index: 30;
+      width: min(280px, 85vw);
       height: 100vh;
-      overflow-y: auto;
-      border-right: 1px solid var(--border);
-      border-bottom: 0;
-      padding: 20px 18px;
+      height: 100dvh;
+      transform: translateX(-100%);
+      visibility: hidden;
+      /* Closing: slide out, then hide. Opening (below): visible at once, so focus works. */
+      transition: transform 0.2s ease, visibility 0s linear 0.2s;
+      box-shadow: var(--shadow);
     }
-    .main { padding: 28px 32px 56px; }
+    .sidebar.drawer-open { transform: none; visibility: visible; transition: transform 0.2s ease, visibility 0s; }
+    .drawer-overlay { display: block; position: fixed; inset: 0; z-index: 20; background: var(--overlay); }
+    .menu-btn { display: inline-flex; }
+    .app-header { padding: 8px 16px; }
+    .search-wrap { order: 3; flex: 1 1 100%; max-width: none; margin: 0; }
+    .new-job-btn { min-height: 44px; }
+    .composer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+    .composer-bar { flex-wrap: wrap; }
+    .composer-hint { flex: 1 1 100%; }
+    .composer-bar .mode-select { flex: 1 1 0; max-width: none; min-width: 0; }
+    .composer-add, .composer-bar .mode-select { min-height: 44px; }
+    .composer-send { width: 44px; height: 44px; }
+    .content { padding: 16px 16px 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar, .sidebar.drawer-open { transition: none; }
   }
   @media (min-width: 1200px) {
     body:not(.hide-images) .page-body { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
@@ -740,7 +811,7 @@
 </head>
 <body>
 <div class="app">
-  <aside class="sidebar" aria-label="ตัวกรองและเครื่องมือ">
+  <aside id="sidebar" class="sidebar" aria-label="ตัวกรองและเครื่องมือ">
     <div class="brand">
       <svg class="logo" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
         <rect class="logo-bg" x="0" y="0" width="28" height="28" rx="7"/>
@@ -750,59 +821,51 @@
       <span class="brand-name">OCR trial</span>
     </div>
 
-    <div class="tabs" role="tablist">
-      <button id="tab-main" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="panel-main">หลัก</button>
-      <button id="tab-export" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-export">ส่งออก</button>
-    </div>
+    <nav class="nav" aria-label="เมนูหลัก">
+      <button id="nav-home" class="nav-item" type="button" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>หน้าแรก</span></button>
+      <button id="nav-jobs" class="nav-item" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>งานของฉัน</span></button>
+      <button id="tab-export" class="nav-item" type="button" aria-controls="panel-export"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M4 19h16"/></svg><span>ส่งออก</span></button>
+    </nav>
 
-    <section id="panel-main" class="panel" role="tabpanel" aria-labelledby="tab-main">
-      <div class="side-section">
-        <input id="file-input" type="file" accept="image/*,.pdf,application/pdf" hidden>
-        <label class="mode-row">
-          <span>โหมดการอ่าน</span>
-          <select id="mode-select" class="mode-select">
-            <option value="auto">อัตโนมัติ</option>
-            <option value="browser">อ่านบนเครื่องนี้</option>
-            <option value="server">ส่งเข้าคิว server</option>
-          </select>
-        </label>
-        <p id="ram-warning" class="notice" role="status" hidden></p>
-      </div>
+    <section id="panel-main" class="panel">
 
-      <div class="side-section">
-        <h3 class="side-title">หน้า</h3>
-        <div id="page-chips" class="chip-row"></div>
-        <div class="chip-row">
-          <button id="select-all-btn" class="chip" type="button">เลือกทั้งหมด</button>
-          <button id="select-none-btn" class="chip" type="button">ไม่เลือกเลย</button>
+      <div class="result-tools">
+        <h3 class="side-title">ผลลัพธ์</h3>
+        <div class="side-section">
+          <h3 class="side-title">หน้า</h3>
+          <div id="page-chips" class="chip-row"></div>
+          <div class="chip-row">
+            <button id="select-all-btn" class="chip" type="button">เลือกทั้งหมด</button>
+            <button id="select-none-btn" class="chip" type="button">ไม่เลือกเลย</button>
+          </div>
+          <p id="pick-status" class="pick-status" aria-live="polite"></p>
+          <div class="range-form">
+            <input id="range-input" class="range-input" type="text" placeholder="เช่น 1-3, 5" aria-label="ช่วงหน้า">
+            <button id="apply-btn" class="btn" type="button">ใช้</button>
+          </div>
+          <p id="range-error" class="range-error" role="alert" hidden></p>
         </div>
-        <p id="pick-status" class="pick-status" aria-live="polite"></p>
-        <div class="range-form">
-          <input id="range-input" class="range-input" type="text" placeholder="เช่น 1-3, 5" aria-label="ช่วงหน้า">
-          <button id="apply-btn" class="btn" type="button">ใช้</button>
+
+        <div class="side-section">
+          <h3 class="side-title">
+            <span>ความมั่นใจขั้นต่ำ</span>
+            <output id="conf-value" class="conf-value" for="conf-slider">0%</output>
+          </h3>
+          <input id="conf-slider" class="conf-slider" type="range" min="0" max="3" step="1" value="0" aria-label="ความมั่นใจขั้นต่ำ">
+          <div class="ticks" aria-hidden="true"><span>0%</span><span>50%</span><span>70%</span><span>90%</span></div>
+          <p id="hidden-count" class="muted" hidden></p>
         </div>
-        <p id="range-error" class="range-error" role="alert" hidden></p>
-      </div>
 
-      <div class="side-section">
-        <h3 class="side-title">
-          <span>ความมั่นใจขั้นต่ำ</span>
-          <output id="conf-value" class="conf-value" for="conf-slider">0%</output>
-        </h3>
-        <input id="conf-slider" class="conf-slider" type="range" min="0" max="3" step="1" value="0" aria-label="ความมั่นใจขั้นต่ำ">
-        <div class="ticks" aria-hidden="true"><span>0%</span><span>50%</span><span>70%</span><span>90%</span></div>
-        <p id="hidden-count" class="muted" hidden></p>
-      </div>
-
-      <div class="side-section">
-        <h3 class="side-title">การแสดงผล</h3>
-        <label class="switch-row"><span>แสดงกรอบข้อความ</span><input id="toggle-boxes" class="switch" type="checkbox" checked></label>
-        <label class="switch-row"><span>แสดงช่องกรอกข้อมูล</span><input id="toggle-fields" class="switch" type="checkbox" checked></label>
-        <label class="switch-row"><span>แสดงรูปหน้า</span><input id="toggle-images" class="switch" type="checkbox" checked></label>
+        <div class="side-section">
+          <h3 class="side-title">การแสดงผล</h3>
+          <label class="switch-row"><span>แสดงกรอบข้อความ</span><input id="toggle-boxes" class="switch" type="checkbox" checked></label>
+          <label class="switch-row"><span>แสดงช่องกรอกข้อมูล</span><input id="toggle-fields" class="switch" type="checkbox" checked></label>
+          <label class="switch-row"><span>แสดงรูปหน้า</span><input id="toggle-images" class="switch" type="checkbox" checked></label>
+        </div>
       </div>
     </section>
 
-    <section id="panel-export" class="panel" role="tabpanel" aria-labelledby="tab-export" hidden>
+    <section id="panel-export" class="panel" aria-label="ส่งออก" hidden>
       <div class="side-section">
         <h3 class="side-title">ส่งออก</h3>
         <button id="copy-btn" class="btn btn-block" type="button" disabled>คัดลอกหน้าที่เลือก</button>
@@ -813,76 +876,117 @@
       </div>
     </section>
 
-    <p class="sidebar-foot muted">ทำงานในเบราว์เซอร์ของคุณ ไม่ส่งไฟล์ออกนอกเครื่อง</p>
+    <div class="sidebar-bottom">
+      <a id="admin-link" class="nav-item" href="/admin" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>ผู้ดูแลระบบ</span></a>
+      <div class="foot-row">
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="เปลี่ยนเป็นโหมดมืด">
+          <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        </button>
+        <button id="logout-btn" class="nav-item" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>ออกจากระบบ</span></button>
+      </div>
+      <p class="model-line"><span class="status-pill"><span class="dot" aria-hidden="true"></span><span id="model-pill">กำลังโหลดโมเดล…</span></span></p>
+      <p class="sidebar-foot muted">ทำงานในเบราว์เซอร์ของคุณ ไม่ส่งไฟล์ออกนอกเครื่อง</p>
+    </div>
   </aside>
 
   <div class="main-col">
-    <header class="navbar">
-      <div class="search-wrap">
-        <div class="search-box">
-          <input id="search-input" type="search" placeholder="ค้นหาข้อความในผลลัพธ์…" aria-label="ค้นหาข้อความในผลลัพธ์" autocomplete="off">
-          <kbd class="kbd" aria-hidden="true">Ctrl K</kbd>
-        </div>
-        <span id="search-count" class="search-count" aria-live="polite"></span>
-        <button id="prev-btn" class="btn icon-btn" type="button" aria-label="ผลก่อนหน้า" disabled>‹</button>
-        <button id="next-btn" class="btn icon-btn" type="button" aria-label="ผลถัดไป" disabled>›</button>
-      </div>
-
-<div id="dropzone" class="btn btn-primary upload-btn" role="button" tabindex="0" aria-label="อัปโหลดไฟล์ใหม่ หรือลากไฟล์มาวาง"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>อัปโหลด</span></div>
-      <span class="status-pill"><span class="dot" aria-hidden="true"></span><span id="model-pill">กำลังโหลดโมเดล…</span></span>
-      <button id="logout-btn" class="btn" type="button">ออกจากระบบ</button>
-    </header>
-
     <main class="main">
-      <header class="page-header">
-        <nav aria-label="เส้นทาง">
-          <ol class="crumbs">
-            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></li>
-            <li>เอกสาร</li>
-            <li aria-current="page">อ่านข้อความ</li>
-          </ol>
-        </nav>
-        <h1>อ่านข้อความจากรูปหรือ PDF</h1>
-        <p class="page-sub">ภาษาไทยและอังกฤษ สูงสุด 30 หน้า ไฟล์ละไม่เกิน 50 MB</p>
+      <h1 class="sr-only">อ่านข้อความจากรูปหรือ PDF</h1>
+      <header class="app-header">
+        <button id="menu-btn" class="menu-btn" type="button" aria-label="เมนู" aria-expanded="false" aria-controls="sidebar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <span id="doc-title" class="doc-title">งานใหม่</span>
+        <div class="search-wrap">
+          <div class="search-box">
+            <input id="search-input" type="search" placeholder="ค้นหาข้อความในผลลัพธ์…" aria-label="ค้นหาข้อความในผลลัพธ์" autocomplete="off">
+            <kbd class="kbd" aria-hidden="true">Ctrl K</kbd>
+          </div>
+          <span id="search-count" class="search-count" aria-live="polite"></span>
+          <button id="prev-btn" class="btn icon-btn" type="button" aria-label="ผลก่อนหน้า" disabled>‹</button>
+          <button id="next-btn" class="btn icon-btn" type="button" aria-label="ผลถัดไป" disabled>›</button>
+        </div>
+        <button id="new-job-btn" class="btn btn-primary new-job-btn" type="button">งานใหม่</button>
       </header>
 
-      <section id="jobs-card" class="card jobs-card" aria-labelledby="jobs-title" hidden>
-        <div class="jobs-head">
-          <h2 id="jobs-title">งานของฉัน</h2>
-          <span id="jobs-count" class="muted"></span>
-        </div>
-        <ul id="jobs-list" class="jobs-list"></ul>
-      </section>
+      <div class="content">
+        <section id="jobs-card" class="card jobs-card" aria-labelledby="jobs-title" hidden>
+          <div class="jobs-head">
+            <h2 id="jobs-title">งานของฉัน</h2>
+            <span id="jobs-count" class="muted"></span>
+          </div>
+          <ul id="jobs-list" class="jobs-list"></ul>
+          <p id="jobs-empty" class="muted jobs-empty" hidden>ยังไม่มีงาน</p>
+        </section>
 
-      <div id="empty-state" class="card empty-card">
-        <span class="drop-icon" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 8.5a4.8 4.8 0 0 1-.5 9.5"/><path d="M12 12v8M8.8 15 12 11.8 15.2 15"/></svg></span>
-        <h2 class="empty-heading">เลือกไฟล์ที่จะอ่าน</h2>
-        <p class="empty-sub">PNG, JPG หรือ PDF · ลากมาวาง หรือกด Ctrl+V เพื่อวางรูป</p>
-        <label for="file-input" class="btn btn-primary">เลือกไฟล์ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></label>
+        <div id="empty-state" class="card empty-card">
+          <svg class="hero-sparkle" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.5 4.9 2.6 7 7.5 7.5-4.9.5-7 2.6-7.5 7.5-.5-4.9-2.6-7-7.5-7.5 4.9-.5 7-2.6 7.5-7.5Z" fill="currentColor"/></svg>
+          <h2 class="empty-heading">อ่านข้อความจากรูปหรือ PDF</h2>
+          <p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF</p>
+          <p class="empty-sub">สูงสุด 30 หน้า · ไฟล์ละไม่เกิน 50 MB</p>
+          <div class="start-grid">
+            <button class="start-card" type="button" data-mode="auto">
+              <svg class="start-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18"/></svg>
+              <span class="start-title">อ่านอัตโนมัติ</span>
+              <span class="start-sub">ระบบเลือกวิธีให้เอง</span>
+            </button>
+            <button class="start-card" type="button" data-mode="browser">
+              <svg class="start-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+              <span class="start-title">อ่านบนเครื่องนี้</span>
+              <span class="start-sub">ไฟล์ไม่ออกนอกเครื่อง</span>
+            </button>
+            <button class="start-card" type="button" data-mode="server">
+              <svg class="start-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3H4z"/><path d="M4 14h16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
+              <span class="start-title">ส่งเข้าคิว server</span>
+              <span class="start-sub">พร้อมสรุปด้วย AI</span>
+            </button>
+            <button class="start-card" type="button" data-action="jobs">
+              <svg class="start-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+              <span class="start-title">งานของฉัน</span>
+              <span class="start-sub">ดูงานที่เคยอ่านไว้</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="status" class="status" role="status" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="status-text"></span>
+        </div>
+        <div id="error" class="error" role="alert" hidden></div>
+
+        <header id="result-head" class="result-head" hidden>
+          <div class="result-title">
+            <h2>ผลลัพธ์</h2>
+            <span id="res-count" class="muted"></span>
+          </div>
+          <div class="result-sub">
+            <span id="res-file" class="mono"></span>
+            <span id="res-meta" class="muted"></span>
+          </div>
+        </header>
+
+        <section id="summary-card" class="card summary-card" aria-labelledby="summary-card-title" hidden></section>
+
+        <div id="results"></div>
       </div>
 
-      <div id="status" class="status" role="status" hidden>
-        <span class="spinner" aria-hidden="true"></span>
-        <span id="status-text"></span>
-      </div>
-      <div id="error" class="error" role="alert" hidden></div>
-
-      <header id="result-head" class="result-head" hidden>
-        <div class="result-title">
-          <h2>ผลลัพธ์</h2>
-          <span id="res-count" class="muted"></span>
+      <footer class="composer">
+        <p id="ram-warning" class="notice" role="status" hidden></p>
+        <div id="dropzone" class="composer-bar">
+          <input id="file-input" type="file" accept="image/*,.pdf,application/pdf" hidden>
+          <span class="composer-hint">ลากไฟล์มาวางที่นี่ หรือกด Ctrl+V</span>
+          <label for="mode-select" class="sr-only">โหมดการอ่าน</label>
+          <select id="mode-select" class="mode-select">
+            <option value="auto">อัตโนมัติ</option>
+            <option value="browser">อ่านบนเครื่องนี้</option>
+            <option value="server">ส่งเข้าคิว server</option>
+          </select>
+          <label for="file-input" class="btn btn-primary composer-add"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>เพิ่มไฟล์</span></label>
+          <button type="button" class="composer-send" id="composer-send" aria-label="เลือกไฟล์"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
         </div>
-        <div class="result-sub">
-          <span id="res-file" class="mono"></span>
-          <span id="res-meta" class="muted"></span>
-        </div>
-      </header>
-
-      <section id="summary-card" class="card summary-card" aria-labelledby="summary-card-title" hidden></section>
-
-      <div id="results"></div>
+      </footer>
     </main>
   </div>
+  <div class="drawer-overlay" hidden></div>
 </div>
 
 <script src="js/jobs_client.js"></script>
@@ -896,6 +1000,7 @@
   // The confidence slider has four stops; index 0..3 maps to these thresholds.
   var STOPS = [0, 0.5, 0.7, 0.9];
   var dropzone = document.getElementById("dropzone");
+  var composerSend = document.getElementById("composer-send");
   var fileInput = document.getElementById("file-input");
   var statusBox = document.getElementById("status");
   var statusText = document.getElementById("status-text");
@@ -904,9 +1009,10 @@
   var emptyState = document.getElementById("empty-state");
   var resultHead = document.getElementById("result-head");
   var pageChips = document.getElementById("page-chips");
+  var docTitle = document.getElementById("doc-title");
   var busy = false;
 
-  // Controls that live in the navbar and sidebar. They exist once, from page load.
+  // Controls that live in the header and sidebar. They exist once, from page load.
   var ui = {
     searchInput: document.getElementById("search-input"),
     countEl: document.getElementById("search-count"),
@@ -970,8 +1076,7 @@
   function setBusy(on) {
     busy = on;
     dropzone.classList.toggle("busy", on);
-    dropzone.setAttribute("aria-disabled", on ? "true" : "false");
-    dropzone.tabIndex = on ? -1 : 0;
+    composerSend.disabled = on;
   }
 
   function showError(message) {
@@ -1378,12 +1483,19 @@
     focusCurrent();
   }
 
+  // Shows the result tools in the sidebar and the search in the header.
+  function setResultOpen(open) {
+    document.body.classList.toggle("result-open", open);
+  }
+
   function clearResults() {
     clearTimeout(searchTimer);
     searchTimer = null;
     results.replaceChildren();
     pageChips.replaceChildren();
     resultHead.hidden = true;
+    docTitle.textContent = "งานใหม่";
+    setResultOpen(false);
     hideSummary();
     currentData = null;
     views = [];
@@ -1415,6 +1527,8 @@
     ui.resFile.textContent = data.filename;
     ui.resMeta.textContent = data.pages.length + " หน้า · " + total.toFixed(2) + " วินาที";
     resultHead.hidden = false;
+    docTitle.textContent = data.filename;
+    setResultOpen(true);
 
     data.pages.forEach(function (page) {
       var view = renderPage(page);
@@ -1678,24 +1792,109 @@
 
   document.addEventListener("keydown", function (e) {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && typeof e.key === "string" && e.key.toLowerCase() === "k") {
+      // Only a result has search; otherwise leave the browser's own Ctrl K alone.
+      if (!document.body.classList.contains("result-open")) return;
       e.preventDefault();
       ui.searchInput.focus();
       ui.searchInput.select();
     }
   });
 
-  var tabs = [document.getElementById("tab-main"), document.getElementById("tab-export")];
-  var panels = [document.getElementById("panel-main"), document.getElementById("panel-export")];
-  tabs.forEach(function (tab, i) {
-    tab.addEventListener("click", function () {
-      tabs.forEach(function (t, j) {
-        var on = i === j;
-        t.classList.toggle("active", on);
-        t.setAttribute("aria-selected", on ? "true" : "false");
-        panels[j].hidden = !on;
-      });
-    });
+  // ---- sidebar navigation, the mobile drawer and the admin link ----
+  var sidebar = document.getElementById("sidebar");
+  var menuBtn = document.getElementById("menu-btn");
+  var drawerOverlay = document.querySelector(".drawer-overlay");
+  var navHome = document.getElementById("nav-home");
+  var navJobs = document.getElementById("nav-jobs");
+  var navExport = document.getElementById("tab-export");
+  var panelMain = document.getElementById("panel-main");
+  var panelExport = document.getElementById("panel-export");
+  var newJobBtn = document.getElementById("new-job-btn");
+  var adminLink = document.getElementById("admin-link");
+
+  function setCurrent(el, on) {
+    if (on) el.setAttribute("aria-current", "page");
+    else el.removeAttribute("aria-current");
+  }
+
+  // Shows the filter panel (exporting false) or the export panel (exporting true).
+  function showPanel(exporting) {
+    panelMain.hidden = exporting;
+    panelExport.hidden = !exporting;
+    setCurrent(navExport, exporting);
+    setCurrent(navHome, !exporting);
+  }
+
+  function drawerIsOpen() {
+    return sidebar.classList.contains("drawer-open");
+  }
+
+  // Opens or closes the mobile drawer. Focus moves into the drawer on open and back to the menu button on close.
+  function setDrawer(open) {
+    sidebar.classList.toggle("drawer-open", open);
+    menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    drawerOverlay.hidden = !open;
+    if (open) {
+      // Flush styles so the drawer is focusable (CSS makes visibility switch on at once), then focus the first nav item.
+      var first = sidebar.querySelector(".nav-item");
+      void sidebar.offsetWidth;
+      if (first) first.focus();
+    } else {
+      menuBtn.focus();
+    }
+  }
+
+  function closeDrawer() {
+    if (drawerIsOpen()) setDrawer(false);
+  }
+
+  menuBtn.addEventListener("click", function () {
+    setDrawer(!drawerIsOpen());
   });
+  drawerOverlay.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && drawerIsOpen()) {
+      e.preventDefault();
+      closeDrawer();
+    }
+  });
+
+  navHome.addEventListener("click", function () {
+    clearResults();
+    if (!busy) emptyState.hidden = false;
+    jobsOpen = false;
+    syncJobsCard();
+    showPanel(false);
+    window.scrollTo(0, 0);
+    closeDrawer();
+  });
+  navJobs.addEventListener("click", function () {
+    // The jobs view stays open even when empty, so the "ยังไม่มีงาน" line can show.
+    jobsOpen = true;
+    syncJobsCard();
+    document.querySelector(".content").scrollIntoView({ block: "start" });
+    closeDrawer();
+  });
+  navExport.addEventListener("click", function () {
+    jobsOpen = false;
+    syncJobsCard();
+    showPanel(true);
+    closeDrawer();
+  });
+  newJobBtn.addEventListener("click", function () {
+    clearResults();
+    if (!busy) emptyState.hidden = false;
+    jobsOpen = false;
+    syncJobsCard();
+    showPanel(false);
+    window.scrollTo(0, 0);
+  });
+
+  // The admin link appears only for admins. A failed request leaves it hidden.
+  fetch("/api/me", { credentials: "same-origin" })
+    .then(function (res) { return res.ok ? res.json() : null; })
+    .then(function (me) { if (me && me.role === "admin") adminLink.hidden = false; })
+    .catch(function () {});
 
   ui.copyBtn.addEventListener("click", function () {
     if (!selectedViews().length) return;
@@ -1763,14 +1962,23 @@
 
   updatePickUI();
 
-  dropzone.addEventListener("click", function () {
+  // The arrow button is the keyboard route to the picker; the bar itself is only a drop target.
+  composerSend.addEventListener("click", function () {
     if (!busy) fileInput.click();
   });
-  dropzone.addEventListener("keydown", function (e) {
-    if ((e.key === "Enter" || e.key === " ") && !busy) {
-      e.preventDefault();
+  // Start cards: a mode card sets the mode (saved like the select) and opens the picker; the jobs card is the nav item.
+  Array.prototype.forEach.call(document.querySelectorAll(".start-card"), function (card) {
+    card.addEventListener("click", function () {
+      if (busy) return;
+      if (card.dataset.action === "jobs") {
+        navJobs.click();
+        return;
+      }
+      var mode = card.dataset.mode;
+      modeSelect.value = mode;
+      modeSelect.dispatchEvent(new Event("change", { bubbles: true }));
       fileInput.click();
-    }
+    });
   });
   ["dragenter", "dragover"].forEach(function (type) {
     dropzone.addEventListener(type, function (e) {
@@ -1852,6 +2060,8 @@
   var jobsCard = document.getElementById("jobs-card");
   var jobsList = document.getElementById("jobs-list");
   var jobsCount = document.getElementById("jobs-count");
+  var jobsEmpty = document.getElementById("jobs-empty");
+  var jobsOpen = false;      // the "งานของฉัน" view is showing, so the card stays even when empty
   var logoutBtn = document.getElementById("logout-btn");
   var jobRows = new Map();   // job id -> row record (see createJobRow)
   var knownStates = null;    // job id -> state at the previous poll; null before the first poll
@@ -2049,6 +2259,13 @@
     rec.delBtn.hidden = !job.mine;  // only the owner sees ลบ; a shared job is viewed, not removed
   }
 
+  // The card shows when there are jobs or the jobs view is open; the empty line shows only while the list is empty.
+  function syncJobsCard() {
+    var empty = jobRows.size === 0;
+    jobsEmpty.hidden = !empty;
+    jobsCard.hidden = empty && !jobsOpen;
+  }
+
   function renderJobs(jobs) {
     var seen = new Set();
     jobs.forEach(function (job) {
@@ -2068,7 +2285,7 @@
       }
     });
     jobsCount.textContent = jobRows.size + " งาน";
-    jobsCard.hidden = jobRows.size === 0;
+    syncJobsCard();
   }
 
   function notifyCompletions(jobs, nextStates) {

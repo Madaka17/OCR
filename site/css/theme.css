@@ -1,0 +1,79 @@
+/* Shared theme tokens. Light is the default; the dark navy set applies when
+   <html data-theme="dark"> is set by js/theme.js. Pages reference these tokens
+   only, so no page stylesheet should contain a colour literal. */
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --primary: #0161F7;
+  --primary-hover: #0050CC;
+  --primary-soft: #E6F0FF;
+  --bg: #F5F8FE;
+  --panel: #FFFFFF;
+  --card: #FFFFFF;
+  --sidebar: #FFFFFF;
+  --field: #EEF3FB;
+  --field-hover: #E3EBF8;
+  --border: #D6E0F0;
+  --hover-border: #B3C3DD;
+  --text: #0F1B33;
+  --text-2: #33456A;
+  --muted: #56658A;
+  --ink: #0F1B33;
+  --overlay: rgba(15, 27, 51, 0.45);
+  --accent: var(--primary);
+  --accent-strong: var(--primary-hover);
+  --accent-soft: color-mix(in srgb, var(--primary) 12%, transparent);
+  --accent-text: #FFFFFF;
+  --green: #15803D;
+  --amber: #B45309;
+  --red: #B91C1C;
+  --green-fill: color-mix(in srgb, #15803D 14%, transparent);
+  --amber-fill: color-mix(in srgb, #B45309 16%, transparent);
+  --red-fill: color-mix(in srgb, #B91C1C 12%, transparent);
+  --match-fill: color-mix(in srgb, #F59E0B 30%, transparent);
+  --match-strong: color-mix(in srgb, #D97706 60%, transparent);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 10px 30px -12px rgba(15, 27, 51, 0.22);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #0161F7;
+  --primary-hover: #0A5CF0;
+  --primary-soft: color-mix(in srgb, #5B9BFF 16%, transparent);
+  --bg: #0B1220;
+  --panel: #0F1A2E;
+  --card: #121B2E;
+  --sidebar: #0E1830;
+  --field: #172238;
+  --field-hover: #1D2B45;
+  --border: #22304A;
+  --hover-border: #32446A;
+  --text: #E6EEFB;
+  --text-2: #B9C7DF;
+  --muted: #8FA0BF;
+  --ink: #000000;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --accent: #5B9BFF;
+  --accent-strong: #0161F7;
+  --accent-soft: color-mix(in srgb, #5B9BFF 16%, transparent);
+  --accent-text: #FFFFFF;
+  --green: #4ADE80;
+  --amber: #F59E0B;
+  --red: #F87171;
+  --green-fill: color-mix(in srgb, #4ADE80 18%, transparent);
+  --amber-fill: color-mix(in srgb, #F59E0B 20%, transparent);
+  --red-fill: color-mix(in srgb, #F87171 20%, transparent);
+  --match-fill: color-mix(in srgb, #FACC15 28%, transparent);
+  --match-strong: color-mix(in srgb, #F59E0B 60%, transparent);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+}
+
+:root {
+  --radius: 14px;
+  --radius-lg: 20px;
+  --chip-radius: 999px;
+  --nav-h: 56px;
+  --font: "IBM Plex Sans Thai", "Leelawadee UI", "Segoe UI", Tahoma, sans-serif;
+  --mono: ui-monospace, Consolas, "Cascadia Mono", monospace;
+}
