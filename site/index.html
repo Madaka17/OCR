@@ -1901,7 +1901,7 @@
       opt.title = m.id;
       modelSelect.appendChild(opt);
     });
-    // Option values are "key|id". A saved value from before keys existed has no "|" and is key "1".
+    // Option values are "key|id". A saved value from before keys existed matches no option and falls back to the default.
     var values = models.map(function (m) { return m.key + "|" + m.id; });
     var defaultValue = "1|" + data.default;
     var saved = null;
