@@ -106,7 +106,7 @@ class JobStore:
         data = json.dumps(meta, ensure_ascii=False).encode("utf-8")
         _atomic_write(self._job_dir(meta["id"]) / "meta.json", data)
 
-    def create(self, owner: str, filename: str, size: int, now: float) -> dict:
+    def create(self, owner: str, filename: str, size: int, now: float, model: str | None = None) -> dict:
         if size <= 0:
             raise JobError(400, "ไฟล์ว่างเปล่า")
         if size > settings.MAX_JOB_BYTES:
@@ -126,6 +126,8 @@ class JobStore:
             "failed_pages": [],
             "error": None,
         }
+        if model is not None:
+            meta["model"] = model
         with self._lock:
             (self._job_dir(job_id) / "upload").mkdir(parents=True)
             self._save_meta(meta)

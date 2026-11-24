@@ -82,9 +82,16 @@ class SummaryWorker:
 
     # ----- record helpers --------------------------------------------------
 
-    def _put(self, job_id: str, now: float, prev: dict, **changes) -> dict | None:
+    def _job_model(self, meta: dict) -> str:
+        """The model this job is summarized with: its own choice, else the server default."""
+        return meta.get("model") or self.model
+
+    def _llm_for(self, model: str):
+        return self.llm if model == self.model else self.llm.with_model(model)
+
+    def _put(self, job_id: str, now: float, prev: dict, model: str, **changes) -> dict | None:
         """Write a full record built from prev. Returns it, or None when the job is gone."""
-        record = {**DEFAULTS, **prev, "model": self.model, **changes, "updated_at": now}
+        record = {**DEFAULTS, **prev, **changes, "model": model, "updated_at": now}
         return record if self.store.write_summary(job_id, record) else None
 
     # ----- queue -----------------------------------------------------------
@@ -95,14 +102,15 @@ class SummaryWorker:
             for meta in self.store.list(None):
                 rec = self.store.read_summary(meta["id"])
                 if rec and rec.get("state") == "running":
-                    self._put(meta["id"], now, rec, state="pending")
+                    self._put(meta["id"], now, rec, self._job_model(meta), state="pending")
 
     def scan(self, now: float) -> None:
         with self._mu:
             for meta in self.store.list(None):
                 # has_summary, not read_summary: an unreadable record must not be reset.
                 if meta["state"] == "done" and not self.store.has_summary(meta["id"]):
-                    self._put(meta["id"], now, {}, state="pending", attempts=0, next_try_at=0)
+                    self._put(meta["id"], now, {}, self._job_model(meta),
+                              state="pending", attempts=0, next_try_at=0)
 
     def next_job(self, now: float) -> str | None:
         candidates = []
@@ -128,6 +136,7 @@ class SummaryWorker:
         meta = self.store.get(job_id)
         if meta is None:
             return
+        model = self._job_model(meta)
         # A run can take many minutes. Times written during or after it (updated_at,
         # next_try_at, last_ok_at) count from `now` plus the time spent so far.
         started = time.monotonic()
@@ -138,32 +147,34 @@ class SummaryWorker:
         with self._mu:
             prev = self.store.read_summary(job_id) or {}
             # progress stays None until the first chunk: the chunk count is not known yet.
-            if self._put(job_id, now, prev, state="running", progress=None) is None:
+            if self._put(job_id, now, prev, model, state="running", progress=None) is None:
                 return
         try:
             self._summarize_and_store(job_id, meta, prev, clock)
         except Exception as e:
             # Any failure after the running write must not leave the record stuck at running.
             self._report(f"summary of {job_id} interrupted, will retry", e)
-            self._repend(job_id, clock(), prev, e)
+            self._repend(job_id, clock(), prev, e, model)
 
-    def _repend(self, job_id: str, now: float, prev: dict, error: BaseException) -> None:
+    def _repend(self, job_id: str, now: float, prev: dict, error: BaseException, model: str) -> None:
         """Count the failure like any other error: retry with growing delay, fail at the limit."""
         attempts = prev.get("attempts", 0) + 1
         self._last_error = str(error)
         try:
             with self._mu:
                 if attempts < ATTEMPT_LIMIT:
-                    self._put(job_id, now, prev, state="pending", attempts=attempts,
+                    self._put(job_id, now, prev, model, state="pending", attempts=attempts,
                               next_try_at=now + RETRY_STEP_SECONDS * attempts,
                               error=_clip(error), progress=None)
                 else:
-                    self._put(job_id, now, prev, state="failed", attempts=attempts,
+                    self._put(job_id, now, prev, model, state="failed", attempts=attempts,
                               error=_clip(error), progress=None)
         except OSError as e:
             self._report("could not re-pend job, recover() will", e)
 
     def _summarize_and_store(self, job_id: str, meta: dict, prev: dict, clock) -> None:
+        model = self._job_model(meta)
+        llm = self._llm_for(model)
         pages = []
         for number in range(1, meta["pages"] + 1):
             page = self.store.read_page(job_id, number)
@@ -171,34 +182,34 @@ class SummaryWorker:
                 pages.append(page)
 
         def progress(done: int, total: int) -> None:
-            self._put(job_id, clock(), prev, state="running", progress=[done, total])
+            self._put(job_id, clock(), prev, model, state="running", progress=[done, total])
 
         try:
-            result = summarizer.summarize(self.llm, pages, meta["filename"], on_progress=progress,
+            result = summarizer.summarize(llm, pages, meta["filename"], on_progress=progress,
                                           page_count=meta["pages"])
         except summarizer.ShortText:
             now = clock()
-            self._put(job_id, now, prev, state="short", result=None, progress=None)
+            self._put(job_id, now, prev, model, state="short", result=None, progress=None)
         except LLMUnavailable as e:
             now = clock()
             waits = prev.get("waits", 0) + 1
             delay = min(UNAVAILABLE_CAP_SECONDS, UNAVAILABLE_BASE_SECONDS * 2 ** (waits - 1))
             self._last_error = str(e)
-            self._put(job_id, now, prev, state="pending", waits=waits,
-                         next_try_at=now + delay, error=_clip(e), progress=None)
+            self._put(job_id, now, prev, model, state="pending", waits=waits,
+                      next_try_at=now + delay, error=_clip(e), progress=None)
         except Exception as e:
             now = clock()
             attempts = prev.get("attempts", 0) + 1
             self._last_error = str(e)
             if attempts < ATTEMPT_LIMIT:
-                self._put(job_id, now, prev, state="pending", attempts=attempts, waits=0,
-                             next_try_at=now + RETRY_STEP_SECONDS * attempts, error=_clip(e), progress=None)
+                self._put(job_id, now, prev, model, state="pending", attempts=attempts, waits=0,
+                          next_try_at=now + RETRY_STEP_SECONDS * attempts, error=_clip(e), progress=None)
             else:
-                self._put(job_id, now, prev, state="failed", attempts=attempts, waits=0,
-                             error=_clip(e), progress=None)
+                self._put(job_id, now, prev, model, state="failed", attempts=attempts, waits=0,
+                          error=_clip(e), progress=None)
         else:
             now = clock()
-            self._put(job_id, now, prev, state="done", result=result, waits=0, error=None, progress=None)
+            self._put(job_id, now, prev, model, state="done", result=result, waits=0, error=None, progress=None)
             self._last_ok_at = now
             self._last_error = None
 
@@ -214,7 +225,7 @@ class SummaryWorker:
                 raise JobError(409, "กำลังสรุปอยู่")
             if meta["state"] != "done":
                 raise JobError(409, "งานยังอ่านไม่เสร็จ")
-            record = self._put(job_id, now, {}, state="pending", attempts=0, waits=0,
+            record = self._put(job_id, now, {}, self._job_model(meta), state="pending", attempts=0, waits=0,
                                next_try_at=0, error=None, result=None, progress=None)
         if record is None:
             raise JobError(404, "ไม่พบงาน")

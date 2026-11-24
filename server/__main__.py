@@ -14,6 +14,7 @@ from server import settings
 from server.app import make_server, start_cleanup
 from server.auth import Auth
 from server.llm import LLMClient
+from server.models import ModelCatalog
 from server.scheduler import Scheduler
 from server.stats import EventLog
 from server.store import JobStore
@@ -80,7 +81,9 @@ def serve() -> int:
     scheduler.start()
     start_cleanup(store, events=events)
     summaries = make_summaries(store)
-    httpd = make_server(settings.HOST, settings.PORT, store, scheduler, auth, events, summaries=summaries)
+    models = ModelCatalog(summaries.llm, settings.LLM_MODEL) if summaries is not None else None
+    httpd = make_server(settings.HOST, settings.PORT, store, scheduler, auth, events,
+                        summaries=summaries, models=models)
     host, port = httpd.server_address[:2]
     print(f"Listening on http://{host}:{port}", flush=True)
     if summaries is not None:

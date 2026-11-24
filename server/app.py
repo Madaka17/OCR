@@ -42,6 +42,7 @@ MSG_CHUNK_TOO_BIG = "ชิ้นไฟล์ใหญ่เกินกำห�
 MSG_TOO_MANY_PAGES = "PDF มีมากเกิน 1000 หน้า"
 MSG_DISK_FULL = "พื้นที่ดิสก์บนเซิร์ฟเวอร์ไม่พอ"
 MSG_SUMMARY_OFF = "ไม่ได้เปิดใช้การสรุปด้วย AI"
+MSG_MODEL_INVALID = "โมเดลนี้ใช้ไม่ได้"
 MSG_SERVER_ERROR = "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์"
 
 CONTENT_TYPES = {
@@ -344,6 +345,7 @@ class Handler(BaseHTTPRequestHandler):
             ("GET", re.compile(_JOB + r"/text"), self._text),
             ("GET", re.compile(_JOB + r"/summary"), self._get_summary),
             ("POST", re.compile(_JOB + r"/summary"), self._post_summary),
+            ("GET", re.compile(r"/api/models"), self._list_models),
             ("GET", re.compile(r"/api/admin/overview"), self._admin_overview),
             ("DELETE", re.compile(r"/api/admin/jobs/([^/]+)"), self._admin_delete_job),
         ]
@@ -357,16 +359,33 @@ class Handler(BaseHTTPRequestHandler):
         metas = self.server.store.list(session["owner"])
         return self._json(200, [self._public(m, session) for m in metas])
 
+    def _list_models(self, session):
+        models = self.server.models
+        if models is None:
+            return self._json(200, {"models": [], "default": None})
+        return self._json(200, {"models": models.list(), "default": models.default})
+
+    def _model_from(self, body: dict) -> str | None:
+        """The model a job asked for, or None. Anything the catalog does not allow is a 400."""
+        model = body.get("model")
+        if model is None:
+            return None
+        models = self.server.models
+        if models is None or not isinstance(model, str) or not model or not models.allowed(model):
+            raise JobError(400, MSG_MODEL_INVALID)
+        return model
+
     def _create_job(self, session):
         body = self._read_json()
         filename = body.get("filename")
         size = body.get("size")
         if not isinstance(filename, str) or not isinstance(size, int) or isinstance(size, bool):
             raise JobError(400, MSG_BAD_REQUEST)
+        model = self._model_from(body)
         free = shutil.disk_usage(_existing_ancestor(self.server.store.root)).free
         if free < size * 2 + DISK_HEADROOM_BYTES:
             raise JobError(507, MSG_DISK_FULL)
-        meta = self.server.store.create(session["owner"], filename, size, now=time.time())
+        meta = self.server.store.create(session["owner"], filename, size, now=time.time(), model=model)
         return self._json(201, {"job": self._public(meta, session), "chunk_size": settings.CHUNK_BYTES})
 
     def _get_job(self, session, job_id):
@@ -482,7 +501,8 @@ class Handler(BaseHTTPRequestHandler):
                           headers=[("Content-Disposition", f"attachment; filename*=UTF-8''{name}")])
 
 
-def make_server(host, port, store, scheduler, auth, events, site_dir=None, summaries=None) -> ThreadingHTTPServer:
+def make_server(host, port, store, scheduler, auth, events, site_dir=None, summaries=None,
+                models=None) -> ThreadingHTTPServer:
     """Create (but do not start) the HTTP server. site_dir defaults to settings.SITE_DIR at call time."""
     httpd = ThreadingHTTPServer((host, port), Handler)
     httpd.store = store
@@ -492,6 +512,7 @@ def make_server(host, port, store, scheduler, auth, events, site_dir=None, summa
     httpd.limiter = LoginLimiter()
     httpd.site_dir = Path(site_dir if site_dir is not None else settings.SITE_DIR)
     httpd.summaries = summaries
+    httpd.models = models
     return httpd
 
 

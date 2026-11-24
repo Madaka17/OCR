@@ -4,6 +4,7 @@ import urllib.parse
 import urllib.request
 
 CONNECT_TIMEOUT_SECONDS = 10
+MODELS_TIMEOUT_SECONDS = 15
 
 
 class LLMError(Exception):
@@ -61,6 +62,22 @@ class LLMClient:
         except (ValueError, TypeError) as exc:
             raise LLMError(f"content is not valid JSON: {exc}") from exc
 
+    def with_model(self, model: str) -> "LLMClient":
+        return LLMClient(self.url, model, timeout=self.timeout, api_key=self.api_key,
+                         reasoning_effort=self.reasoning_effort)
+
+    def list_models(self) -> list[str]:
+        """The model ids the server offers, in API order, without duplicates."""
+        raw = self._send("/models", None, timeout=min(MODELS_TIMEOUT_SECONDS, self.timeout))
+        try:
+            items = json.loads(raw)["data"]
+            if not isinstance(items, list):
+                raise TypeError("data is not a list")
+            ids = [item["id"] for item in items if isinstance(item["id"], str)]
+        except (ValueError, KeyError, IndexError, TypeError) as exc:
+            raise LLMError(f"malformed models response: {exc}") from exc
+        return list(dict.fromkeys(ids))
+
     def ping(self) -> bool:
         try:
             request = urllib.request.Request(f"{self.url}/models", headers=self._auth_headers())
@@ -69,25 +86,28 @@ class LLMClient:
         except Exception:
             return False
 
-    def _send(self, path: str, data: bytes) -> bytes:
-        """POST data. Connect failures mean the server is down (LLMUnavailable); a
-        server that accepts the request but answers too slowly is an LLMError."""
+    def _send(self, path: str, data: bytes | None, timeout: float | None = None) -> bytes:
+        """POST data, or GET when data is None. Connect failures mean the server is down
+        (LLMUnavailable); a server that accepts the request but answers too slowly is an
+        LLMError."""
+        timeout = self.timeout if timeout is None else timeout
+        method = "GET" if data is None else "POST"
         parts = urllib.parse.urlsplit(self.url + path)
         cls = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
-        conn = cls(parts.hostname, parts.port, timeout=min(CONNECT_TIMEOUT_SECONDS, self.timeout))
+        conn = cls(parts.hostname, parts.port, timeout=min(CONNECT_TIMEOUT_SECONDS, timeout))
         try:
             try:
                 conn.connect()
             except OSError as exc:
                 raise LLMUnavailable(f"LLM server unreachable: {exc}") from exc
-            conn.sock.settimeout(self.timeout)
+            conn.sock.settimeout(timeout)
             try:
                 headers = {"Content-Type": "application/json", **self._auth_headers()}
-                conn.request("POST", parts.path, body=data, headers=headers)
+                conn.request(method, parts.path, body=data, headers=headers)
                 resp = conn.getresponse()
                 raw = resp.read()
             except TimeoutError as exc:
-                raise LLMError(f"LLM request timed out after {self.timeout:g}s") from exc
+                raise LLMError(f"LLM request timed out after {timeout:g}s") from exc
             except (OSError, http.client.HTTPException) as exc:
                 raise LLMUnavailable(f"LLM server unavailable: {exc!r}") from exc
             if resp.status >= 400:

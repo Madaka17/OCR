@@ -13,6 +13,7 @@ from server import app as app_mod
 from server import scheduler as sched_mod
 from server.app import make_server, start_cleanup
 from server.auth import Auth
+from server.models import ModelCatalog
 from server.scheduler import Scheduler
 from server.stats import EventLog
 from server.store import JobStore
@@ -95,7 +96,17 @@ def env_llm(tmp_path):
     yield from serve_env(tmp_path, llm=True)
 
 
-def serve_env(tmp_path, llm):
+class FakeModelsLLM:
+    def list_models(self):
+        return ["model-a", "model-b"]
+
+
+@pytest.fixture
+def env_models(tmp_path):
+    yield from serve_env(tmp_path, llm=False, models=ModelCatalog(FakeModelsLLM(), "model-a"))
+
+
+def serve_env(tmp_path, llm, models=None):
     data = tmp_path / "data"
     site = tmp_path / "site"
     (site / "js").mkdir(parents=True)
@@ -116,7 +127,8 @@ def serve_env(tmp_path, llm):
     wait_until_alive(sched)
     # The worker is built but never started: tests drive summary records directly.
     summaries = SummaryWorker(store, None, "test-model", url="http://llm.test/v1") if llm else None
-    httpd = make_server("127.0.0.1", 0, store, sched, auth, events, site_dir=site, summaries=summaries)
+    httpd = make_server("127.0.0.1", 0, store, sched, auth, events, site_dir=site, summaries=summaries,
+                        models=models)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     yield SimpleNamespace(
@@ -878,3 +890,70 @@ def test_post_summary_unknown_job_404(env_llm):
 def test_summary_routes_need_login(env_llm):
     assert env_llm.client.fresh().request("GET", "/api/jobs/x/summary").status == 401
     assert env_llm.client.fresh().request("POST", "/api/jobs/x/summary").status == 401
+
+
+# ----- model choice (per job) -------------------------------------------------
+
+MODEL_INVALID_MSG = "โมเดลนี้ใช้ไม่ได้"
+
+
+def test_models_requires_login(env_models):
+    assert env_models.client.fresh().request("GET", "/api/models").status == 401
+
+
+def test_models_lists_catalog_with_default(env_models):
+    user = logged_in(env_models)
+
+    r = user.request("GET", "/api/models")
+
+    assert r.status == 200
+    assert r.json() == {
+        "models": [{"id": "model-a", "name": "model-a"}, {"id": "model-b", "name": "model-b"}],
+        "default": "model-a",
+    }
+
+
+def test_models_empty_when_no_catalog(env):
+    r = logged_in(env).request("GET", "/api/models")
+
+    assert r.status == 200
+    assert r.json() == {"models": [], "default": None}
+
+
+def test_create_job_with_allowed_model_stores_it(env_models):
+    user = logged_in(env_models)
+
+    r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-b"})
+    job_id = r.json()["job"]["id"]
+
+    assert r.status == 201
+    assert r.json()["job"]["model"] == "model-b"
+    assert user.request("GET", f"/api/jobs/{job_id}").json()["model"] == "model-b"
+
+
+def test_create_job_with_disallowed_model_is_400_and_creates_nothing(env_models):
+    user = logged_in(env_models)
+
+    for bad in ["no-such-model", 123, "", ["x"]]:
+        r = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": bad})
+        assert r.status == 400, bad
+        assert r.json() == {"error": MODEL_INVALID_MSG}
+    assert env_models.store.list(None) == []
+
+
+def test_create_job_with_any_model_is_400_without_catalog(env):
+    r = logged_in(env).request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": "model-a"})
+
+    assert r.status == 400
+    assert r.json() == {"error": MODEL_INVALID_MSG}
+    assert env.store.list(None) == []
+
+
+def test_create_job_without_model_has_no_model_key(env_models):
+    user = logged_in(env_models)
+
+    job_id = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10}).json()["job"]["id"]
+    null_id = user.request("POST", "/api/jobs", {"filename": "a.pdf", "size": 10, "model": None}).json()["job"]["id"]
+
+    assert "model" not in user.request("GET", f"/api/jobs/{job_id}").json()
+    assert "model" not in user.request("GET", f"/api/jobs/{null_id}").json()
