@@ -92,3 +92,14 @@ test("index.html: sidebar shell contract", () => {
   assert.match(html, /function setResultOpen\(open\)/, "setResultOpen defined");
   assert.match(html, /@media \(max-width: 768px\)/, "drawer breakpoint is 768px");
 });
+
+test("index.html: drawer moves focus in after a layout flush, and jobs nav shows the card only with items", () => {
+  // No DOM harness in this repo: these pin the source-level fix (no seam for real focus).
+  const html = read("index.html");
+  const setDrawer = html.slice(html.indexOf("function setDrawer(open)"), html.indexOf("function closeDrawer()"));
+  assert.match(setDrawer, /sidebar\.offsetWidth/, "forces a style flush before focusing");
+  assert.match(setDrawer, /requestAnimationFrame\(/, "retries focus on the next frame");
+  const jobs = html.slice(html.indexOf('navJobs.addEventListener("click"'), html.indexOf('navExport.addEventListener("click"'));
+  assert.match(jobs, /jobs-list[\s\S]*children\.length/, "jobs card shown only when the list has items");
+  assert.match(jobs, /scrollIntoView/, "scrolls to the top of the content");
+});

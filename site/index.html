@@ -1761,8 +1761,14 @@
     menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
     drawerOverlay.hidden = !open;
     if (open) {
+      // Flush styles so the drawer is focusable, then focus the first nav item.
+      // Retry on the next frame in case the visibility transition still gates focus.
       var first = sidebar.querySelector(".nav-item");
+      void sidebar.offsetWidth;
       if (first) first.focus();
+      requestAnimationFrame(function () {
+        if (drawerIsOpen() && first && !sidebar.contains(document.activeElement)) first.focus();
+      });
     } else {
       menuBtn.focus();
     }
@@ -1791,8 +1797,10 @@
   });
   navJobs.addEventListener("click", function () {
     var card = document.getElementById("jobs-card");
-    card.hidden = false;
-    card.scrollIntoView({ block: "start" });
+    var list = document.getElementById("jobs-list");
+    // Reveal the card only when there are jobs to show; an empty card stays hidden.
+    card.hidden = list.children.length === 0;
+    document.querySelector(".content").scrollIntoView({ block: "start" });
     closeDrawer();
   });
   navExport.addEventListener("click", function () {
