@@ -395,7 +395,7 @@ class Handler(BaseHTTPRequestHandler):
         if free < size * 2 + DISK_HEADROOM_BYTES:
             raise JobError(507, MSG_DISK_FULL)
         meta = self.server.store.create(session["owner"], filename, size, now=time.time(), model=model,
-                                                 llm_key=llm_key)
+                                        llm_key=llm_key)
         return self._json(201, {"job": self._public(meta, session), "chunk_size": settings.CHUNK_BYTES})
 
     def _get_job(self, session, job_id):

@@ -226,6 +226,29 @@ def test_list_models_parses_ids_dedups_and_sends_auth(stub):
     assert state.auth == ["Bearer k123"]
 
 
+def test_list_models_keeps_only_active_chat_models(stub):
+    base, state = stub
+    state.body = json.dumps({"data": [
+        {"id": "deepseek/chat", "status": "active", "supported_endpoints": ["chat.completions", "responses"]},
+        {"id": "paxa/paxa-ocr-lite-v1", "status": "active", "supported_endpoints": ["ocr"]},
+        {"id": "paxa/paxa-tts", "status": "active", "supported_endpoints": ["audio.speech"]},
+        {"id": "qwen/chat", "status": "active", "supported_endpoints": ["chat.completions"]},
+        {"id": "bare"},
+    ]}).encode()
+
+    assert LLMClient(base, "m").list_models() == ["deepseek/chat", "qwen/chat", "bare"]
+
+
+def test_list_models_skips_inactive_entries(stub):
+    base, state = stub
+    state.body = json.dumps({"data": [
+        {"id": "old", "status": "retired", "supported_endpoints": ["chat.completions"]},
+        {"id": "new", "status": "active", "supported_endpoints": ["chat.completions"]},
+    ]}).encode()
+
+    assert LLMClient(base, "m").list_models() == ["new"]
+
+
 def test_list_models_error_body_redacts_key(stub):
     base, state = stub
     state.status = 500

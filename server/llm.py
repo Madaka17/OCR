@@ -20,6 +20,17 @@ class LLMUnavailable(LLMError):
     """
 
 
+def _is_chat_model(item: dict) -> bool:
+    """False for entries that are not usable for chat: an inactive model, or one whose
+    supported_endpoints list lacks chat.completions. An entry without those fields stays."""
+    if "status" in item and item["status"] != "active":
+        return False
+    endpoints = item.get("supported_endpoints")
+    if isinstance(endpoints, list) and "chat.completions" not in endpoints:
+        return False
+    return True
+
+
 class LLMClient:
     def __init__(
         self,
@@ -73,7 +84,7 @@ class LLMClient:
             items = json.loads(raw)["data"]
             if not isinstance(items, list):
                 raise TypeError("data is not a list")
-            ids = [item["id"] for item in items if isinstance(item["id"], str)]
+            ids = [item["id"] for item in items if isinstance(item["id"], str) and _is_chat_model(item)]
         except (ValueError, KeyError, IndexError, TypeError) as exc:
             raise LLMError(f"malformed models response: {exc}") from exc
         return list(dict.fromkeys(ids))
