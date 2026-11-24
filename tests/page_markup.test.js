@@ -102,8 +102,82 @@ test("index.html: drawer moves focus in after a layout flush, and jobs nav shows
   const css = html.slice(html.indexOf("@media (max-width: 768px)"), html.indexOf("@media (min-width: 1200px)"));
   assert.match(css, /\.sidebar \{[^}]*transition: transform 0\.2s ease, visibility 0s linear 0\.2s/, "closed: visibility hides after the slide");
   assert.match(css, /\.sidebar\.drawer-open \{[^}]*visibility: visible[^}]*transition: transform 0\.2s ease, visibility 0s/, "open: visibility switches on at once");
-  assert.match(css, /\.sidebar \{ transition: none; \}/, "reduced motion disables the transition");
+  assert.match(css, /\.sidebar, \.sidebar\.drawer-open \{ transition: none; \}/, "reduced motion disables the transition, open state too");
   const jobs = html.slice(html.indexOf('navJobs.addEventListener("click"'), html.indexOf('navExport.addEventListener("click"'));
   assert.match(jobs, /jobs-list[\s\S]*children\.length/, "jobs card shown only when the list has items");
   assert.match(jobs, /scrollIntoView/, "scrolls to the top of the content");
+});
+
+// ---- chat-style empty state and bottom upload bar ----
+
+function block(html, tagPattern, from, to) {
+  const start = html.indexOf(from);
+  assert.ok(start >= 0, `${from} is in the markup`);
+  const end = html.indexOf(to, start);
+  assert.ok(end > start, `${to} follows ${from}`);
+  return html.slice(start, end);
+}
+
+function startCard(hero, attr) {
+  const m = hero.match(new RegExp(`<button class="start-card"[^>]*${attr}[^>]*>([\\s\\S]*?)<\\/button>`));
+  assert.ok(m, `start card with ${attr}`);
+  return m[1];
+}
+
+test("index.html: empty-state hero with four start cards", () => {
+  const html = read("index.html");
+  const hero = block(html, null, '<div id="empty-state"', '<div id="status"');
+  assert.match(hero, /<svg class="hero-sparkle" width="40" height="40"/, "40px sparkle svg");
+  assert.match(hero, /<h2 class="empty-heading">อ่านข้อความจากรูปหรือ PDF<\/h2>/, "hero heading");
+  assert.match(hero, /<p class="empty-sub">ภาษาไทยและอังกฤษ · PNG, JPG หรือ PDF<\/p>/, "hero sub line");
+  assert.equal((hero.match(/class="start-card"/g) || []).length, 4, "four start cards");
+
+  const auto = startCard(hero, 'data-mode="auto"');
+  assert.match(auto, /อ่านอัตโนมัติ/, "auto card title");
+  assert.match(auto, /<svg/, "auto card icon");
+
+  const browser = startCard(hero, 'data-mode="browser"');
+  assert.match(browser, /อ่านบนเครื่องนี้/, "browser card title");
+  assert.match(browser, /ไฟล์ไม่ออกนอกเครื่อง/, "browser card sub line");
+  assert.match(browser, /<svg/, "browser card icon");
+
+  const server = startCard(hero, 'data-mode="server"');
+  assert.match(server, /ส่งเข้าคิว server/, "server card title");
+  assert.match(server, /พร้อมสรุปด้วย AI/, "server card sub line");
+  assert.match(server, /<svg/, "server card icon");
+
+  const jobs = startCard(hero, 'data-action="jobs"');
+  assert.match(jobs, /งานของฉัน/, "jobs card title");
+  assert.match(jobs, /<svg/, "jobs card icon");
+});
+
+test("index.html: #mode-select exists once, lives in the composer, and keeps its options", () => {
+  const html = read("index.html");
+  assert.equal((html.match(/id="mode-select"/g) || []).length, 1, "mode-select appears once");
+  assert.equal((html.match(/id="file-input"/g) || []).length, 1, "file-input appears once");
+  const composer = block(html, null, '<footer class="composer">', "</footer>");
+  assert.match(composer, /<select id="mode-select"/, "mode-select is in the composer");
+  assert.match(composer, /<label for="mode-select"[^>]*class="sr-only"[^>]*>โหมดการอ่าน<\/label>/, "visually hidden label");
+  for (const value of ["auto", "browser", "server"]) {
+    assert.match(composer, new RegExp(`<option value="${value}">`), `option ${value}`);
+  }
+});
+
+test("index.html: bottom upload bar contract", () => {
+  const html = read("index.html");
+  const composer = block(html, null, '<footer class="composer">', "</footer>");
+  assert.match(composer, /<div id="dropzone"(?![^>]*role=)(?![^>]*tabindex)[^>]*>/, "dropzone is a plain drop target");
+  assert.match(composer, /ลากไฟล์มาวางที่นี่ หรือกด Ctrl\+V/, "placeholder copy");
+  assert.match(composer, /<label for="file-input"[^>]*>[\s\S]*?เพิ่มไฟล์[\s\S]*?<\/label>/, "เพิ่มไฟล์ label for file-input");
+  assert.match(composer, /<button type="button" class="composer-send"[^>]*aria-label="เลือกไฟล์"/, "send-style arrow button");
+  assert.doesNotMatch(composer, /<button[^>]*role="button"/, "no nested role=button");
+});
+
+test("index.html: start cards and bar wire to the existing handlers", () => {
+  const html = read("index.html");
+  const script = html.slice(html.lastIndexOf("<script>"));
+  assert.match(script, /modeSelect\.value = mode;[\s\S]{0,200}modeSelect\.dispatchEvent\(new Event\("change", \{ bubbles: true \}\)\);[\s\S]{0,80}fileInput\.click\(\);/, "mode card sets, dispatches change, opens picker");
+  assert.match(script, /action === "jobs"[\s\S]{0,120}navJobs\.click\(\)/, "jobs card reuses the nav handler");
+  assert.match(html, /body:not\(\.result-open\) \.new-job-btn \{ display: none; \}/, "new-job button hidden without a result");
+  assert.match(html, /\.composer-bar\.drag \{[^}]*outline: 2px dashed var\(--primary\)/, "drag state uses --primary dashed outline");
 });
