@@ -88,3 +88,14 @@ test("toggle stores the new theme and updates toggle buttons", () => {
   assert.equal(button.attrs["aria-pressed"], "false");
   assert.equal(button.attrs["aria-label"], "เปลี่ยนเป็นโหมดมืด");
 });
+
+test("syncButtons updates a toggle rendered after init (stored dark)", () => {
+  const win = fakeWin({ stored: "dark" });
+  // init runs from <head>, before the page's toggle button is in the DOM.
+  Theme.init(win);
+  const button = { attrs: {}, setAttribute(k, v) { this.attrs[k] = String(v); } };
+  win._buttons.push(button);
+  Theme.syncButtons(win);
+  assert.equal(button.attrs["aria-label"], "เปลี่ยนเป็นโหมดสว่าง");
+  assert.equal(button.attrs["aria-pressed"], "true");
+});

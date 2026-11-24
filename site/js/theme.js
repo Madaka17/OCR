@@ -45,9 +45,12 @@
     }
   }
 
-  function syncButtons(win, t) {
+  // Sets every [data-theme-toggle] button to the theme currently on <html>.
+  // Safe to call before the buttons exist: it simply finds none.
+  function syncButtons(win) {
     const doc = win.document;
     if (!doc || typeof doc.querySelectorAll !== "function") return;
+    const t = resolveTheme(doc.documentElement.dataset ? doc.documentElement.dataset.theme : undefined);
     const label = t === "dark" ? LABEL_TO_LIGHT : LABEL_TO_DARK;
     for (const button of doc.querySelectorAll("[data-theme-toggle]")) {
       button.setAttribute("aria-label", label);
@@ -58,7 +61,7 @@
   function init(win) {
     const t = resolveTheme(readStored(storageOf(win)));
     apply(win.document.documentElement, t);
-    syncButtons(win, t);
+    syncButtons(win);
     return t;
   }
 
@@ -67,7 +70,7 @@
     const next = nextTheme(docEl.dataset ? docEl.dataset.theme : undefined);
     apply(docEl, next);
     writeStored(storageOf(win), next);
-    syncButtons(win, next);
+    syncButtons(win);
     return next;
   }
 
@@ -79,6 +82,7 @@
     writeStored,
     apply,
     init,
+    syncButtons,
     toggle,
   };
 
@@ -87,6 +91,14 @@
 
   if (typeof window !== "undefined" && window.document) {
     init(window);
+    // Buttons are in <body>, which does not exist yet while this runs in <head>.
+    if (window.document.readyState === "loading") {
+      window.document.addEventListener("DOMContentLoaded", function () {
+        syncButtons(window);
+      });
+    } else {
+      syncButtons(window);
+    }
     window.document.addEventListener("click", function (ev) {
       const target = ev.target;
       if (target && typeof target.closest === "function" && target.closest("[data-theme-toggle]")) {
