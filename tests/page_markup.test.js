@@ -185,9 +185,10 @@ test("index.html: no mode choice left, one file input", () => {
   assert.equal((html.match(/id="file-input"/g) || []).length, 1, "file-input appears once");
 });
 
-test("index.html: model pill is static server text", () => {
+test("index.html: sidebar has no server status pill or footer note", () => {
   const html = read("index.html");
-  assert.match(html, /<span id="model-pill">อ่านผ่าน server<\/span>/, "model pill text");
+  assert.doesNotMatch(html, /id="model-pill"/, "model pill removed");
+  assert.doesNotMatch(html, /class="sidebar-foot/, "sidebar footer note removed");
 });
 
 test("index.html: bottom upload bar contract", () => {
