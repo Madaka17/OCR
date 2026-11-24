@@ -6,6 +6,7 @@ import pytest
 from server import __main__ as cli
 from server import settings
 from server.auth import Auth
+from server.llm import FailoverLLM, LLMClient
 
 
 @pytest.fixture
@@ -63,7 +64,8 @@ def test_make_summaries_two_keys_builds_both_and_hides_them(monkeypatch, capsys)
 
     worker = cli.make_summaries(None)
 
-    assert sorted(worker.llms) == ["1", "2"]
+    assert sorted(worker.clients) == ["1", "2"]
+    assert isinstance(worker.llm, FailoverLLM)
     out = capsys.readouterr().out
     assert "AI summary: second API key set" in out
     assert FAKE_KEY_1 not in out and FAKE_KEY_2 not in out
@@ -76,7 +78,8 @@ def test_make_summaries_one_key_builds_only_key_one(monkeypatch, capsys):
 
     worker = cli.make_summaries(None)
 
-    assert sorted(worker.llms) == ["1"]
+    assert sorted(worker.clients) == ["1"]
+    assert isinstance(worker.llm, LLMClient)
     out = capsys.readouterr().out
     assert "second API key set" not in out
     assert FAKE_KEY_1 not in out

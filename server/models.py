@@ -46,7 +46,7 @@ class _KeyModels:
 
 
 class ModelCatalog:
-    """The model ids each API key offers, default first. Refreshed every `ttl` seconds.
+    """The model ids the API keys offer together, each id once, default first. Refreshed every `ttl` seconds.
 
     Key "1" is `llm`. `others` maps more key names to their clients. A failed refresh
     keeps that key's last good list. Before any good list exists, only the default is
@@ -63,20 +63,14 @@ class ModelCatalog:
     def default(self) -> str:
         return self._default
 
-    def keys(self) -> list[str]:
-        return list(self._sources)
+    def _union(self) -> list[str]:
+        ids: dict[str, None] = {}
+        for source in self._sources.values():
+            ids.update(dict.fromkeys(source.ids()))
+        return list(ids)
 
     def list(self) -> list[dict]:
-        two_keys = len(self._sources) > 1
-        items = []
-        for key, source in self._sources.items():
-            for model_id in source.ids():
-                name = short_name(model_id)
-                if two_keys:
-                    name += f" · key {key}"
-                items.append({"id": model_id, "name": name, "key": key})
-        return items
+        return [{"id": model_id, "name": short_name(model_id)} for model_id in self._union()]
 
-    def allowed(self, model_id, key: str = "1") -> bool:
-        source = self._sources.get(key)
-        return source is not None and model_id in source.ids()
+    def allowed(self, model_id) -> bool:
+        return model_id in self._union()

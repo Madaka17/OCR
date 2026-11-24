@@ -13,7 +13,7 @@ import sys
 from server import settings
 from server.app import make_server, start_cleanup
 from server.auth import Auth
-from server.llm import LLMClient
+from server.llm import FailoverLLM, LLMClient
 from server.models import ModelCatalog
 from server.scheduler import Scheduler
 from server.stats import EventLog
@@ -66,12 +66,15 @@ def make_summaries(store):
             reasoning_effort=settings.LLM_REASONING_EFFORT or None,
         )
 
-    llm = client(settings.LLM_API_KEY)
-    llms = {"1": llm}
+    clients = {"1": client(settings.LLM_API_KEY)}
     if settings.LLM_API_KEY_2:
-        llms["2"] = client(settings.LLM_API_KEY_2)
+        clients["2"] = client(settings.LLM_API_KEY_2)
         print("AI summary: second API key set", flush=True)
-    return SummaryWorker(store, llm, settings.LLM_MODEL, url=settings.LLM_URL, llms=llms)
+    # Key 1 is always tried first; key 2 is used only for a call that key 1 fails.
+    llm = FailoverLLM(list(clients.values())) if len(clients) > 1 else clients["1"]
+    worker = SummaryWorker(store, llm, settings.LLM_MODEL, url=settings.LLM_URL)
+    worker.clients = clients  # the raw per-key clients, for the model catalog
+    return worker
 
 
 def serve() -> int:
@@ -91,8 +94,8 @@ def serve() -> int:
     summaries = make_summaries(store)
     models = None
     if summaries is not None:
-        others = {name: c for name, c in summaries.llms.items() if name != "1"}
-        models = ModelCatalog(summaries.llm, settings.LLM_MODEL, others=others or None)
+        others = {name: c for name, c in summaries.clients.items() if name != "1"}
+        models = ModelCatalog(summaries.clients["1"], settings.LLM_MODEL, others=others or None)
     httpd = make_server(settings.HOST, settings.PORT, store, scheduler, auth, events,
                         summaries=summaries, models=models)
     host, port = httpd.server_address[:2]

@@ -292,13 +292,13 @@ test("index.html: model-select rules use theme tokens only", () => {
   }
 });
 
-test("index.html: model options carry key|id values and the key is sent only when it is not 1", () => {
+test("index.html: option values are plain model ids; the key is never sent", () => {
   const html = read("index.html");
   const script = html.slice(html.lastIndexOf("<script>"));
-  assert.match(script, /opt\.value = m\.key \+ "\|" \+ m\.id;/, "option value is key|id");
+  assert.match(script, /opt\.value = m\.id;/, "option value is the plain model id");
+  assert.match(script, /opt\.textContent = m\.name;/, "text is the short name");
   assert.match(script, /opt\.title = m\.id;/, "title is the model id");
-  assert.match(script, /"1\|" \+ data\.default/, "old default is key 1");
-  assert.match(script, /saved\.indexOf\("\|"\) < 0/, "saved value without | is treated as key 1");
-  assert.match(script, /body\.model = modelSelect\.value\.slice\(sep \+ 1\);/, "model id is sent in the body");
-  assert.match(script, /if \(key !== "1"\) body\.key = key;/, "key sent only when it is not 1");
+  assert.doesNotMatch(script, /m\.key/, "no key field in the option list");
+  assert.doesNotMatch(script, /body\.key/, "the upload body never carries a key");
+  assert.match(script, /lastIndexOf\("\|"\)/, "a saved key|id value is read after its last |");
 });
