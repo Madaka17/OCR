@@ -169,12 +169,12 @@ test("index.html: empty-state hero with two start cards", () => {
   assert.doesNotMatch(hero, /data-mode=/, "no data-mode card left in the hero");
 
   const upload = startCard(hero, 'data-action="upload"');
-  assert.match(upload, /อัปโหลดไฟล์/, "upload card title");
-  assert.match(upload, /ส่งเข้าคิว พร้อมสรุปด้วย AI/, "upload card sub line");
+  assert.match(upload, /ส่งไฟล์ค้าบเธอ/, "upload card title");
+  assert.match(upload, /มี AI สรุปให้ด้วยน้าตัวเธอ/, "upload card sub line");
   assert.match(upload, /<svg/, "upload card icon");
 
   const jobs = startCard(hero, 'data-action="jobs"');
-  assert.match(jobs, /งานของฉัน/, "jobs card title");
+  assert.match(jobs, /ทรงงานอย่างหนัก/, "jobs card title");
   assert.match(jobs, /<svg/, "jobs card icon");
 });
 
